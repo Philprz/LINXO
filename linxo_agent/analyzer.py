@@ -285,6 +285,70 @@ def analyser_transactions(transactions):
     }
 
 
+def generer_conseil_budget(total_depenses, budget_max):
+    """
+    Génère un conseil budget intelligent basé sur la situation
+
+    Args:
+        total_depenses: Total des dépenses variables
+        budget_max: Budget maximum alloué
+
+    Returns:
+        str: Conseil formaté
+    """
+    now = datetime.now()
+    jour_actuel = now.day
+    dernier_jour = calendar.monthrange(now.year, now.month)[1]
+    jours_restants = dernier_jour - jour_actuel
+
+    reste = budget_max - total_depenses
+    pourcentage = (total_depenses / budget_max * 100) if budget_max > 0 else 0
+    budget_jour = reste / jours_restants if jours_restants > 0 else 0
+
+    # Calcul de l'avancement théorique
+    avancement_mois = (jour_actuel / dernier_jour * 100)
+    depense_theorique = budget_max * (jour_actuel / dernier_jour)
+    ecart = depense_theorique - total_depenses
+
+    conseils = []
+
+    # Déterminer le statut
+    if reste < 0:
+        # Budget dépassé
+        depassement = abs(reste)
+        conseils.append(f"ALERTE BUDGET DEPASSE DE {depassement:.2f}E !")
+        conseils.append(f"Vous avez depense {pourcentage:.0f}% de votre budget.")
+        conseils.append(f"Il reste {jours_restants} jours dans le mois.")
+        conseils.append("")
+        conseils.append("RECOMMANDATION : Limitez au maximum les depenses non essentielles !")
+
+    elif pourcentage >= 80:
+        # Attention
+        conseils.append(f"Attention au rythme de depenses !")
+        conseils.append(f"Vous avez depense {total_depenses:.2f}E sur {budget_max:.2f}E ({pourcentage:.0f}%).")
+        conseils.append(f"Nous sommes au jour {jour_actuel}/{dernier_jour} du mois ({avancement_mois:.0f}%).")
+        conseils.append("")
+
+        if ecart > 0:
+            conseils.append(f"Vous etes en avance de {abs(ecart):.2f}E par rapport au rythme normal.")
+
+        conseils.append(f"CONSEIL : Limitez-vous a {budget_jour:.2f}E/jour pour les {jours_restants} jours restants.")
+
+    else:
+        # Budget OK
+        conseils.append(f"Budget sous controle !")
+        conseils.append(f"Depenses : {total_depenses:.2f}E / {budget_max:.2f}E ({pourcentage:.0f}%).")
+        conseils.append(f"Il vous reste {reste:.2f}E pour {jours_restants} jours.")
+        conseils.append(f"Vous pouvez depenser environ {budget_jour:.2f}E/jour.")
+        conseils.append("")
+
+        if ecart < -50:
+            conseils.append(f"Excellent ! Vous etes en retard de {abs(ecart):.2f}E sur le budget prevu.")
+            conseils.append("Vous gerez tres bien votre budget !")
+
+    return "\n".join(conseils)
+
+
 def generer_rapport(analyse, transactions_exclues, budget_max=None):
     """
     Génère un rapport détaillé de l'analyse
@@ -371,6 +435,14 @@ def generer_rapport(analyse, transactions_exclues, budget_max=None):
 
     rapport.append(f"\nJour {jour_actuel}/{dernier_jour} du mois")
     rapport.append("")
+
+    # Ajouter les conseils budget
+    conseil = generer_conseil_budget(analyse['total_variables'], budget_max)
+    rapport.append("CONSEIL DE VOTRE AGENT BUDGET")
+    rapport.append("-" * 80)
+    rapport.append(conseil)
+    rapport.append("")
+
     rapport.append("=" * 80)
     rapport.append(f"TOTAL GENERAL: {analyse['total']:10.2f}E")
     rapport.append("=" * 80)
