@@ -1,0 +1,15 @@
+{
+  "linxo": {
+    "url": "https://wwws.linxo.com/auth.page#Login",
+    "email": "votre-email@example.com",
+    "password": "votre-mot-de-passe"
+  },
+  "budget": {
+    "variable": 1323.73
+  },
+  "notification": {
+    "email": "destinataire@example.com",
+    "sender_email": "expediteur@example.com",
+    "telephone": "+33XXXXXXXXX"
+  }
+}

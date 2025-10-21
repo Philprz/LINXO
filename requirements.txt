@@ -1,0 +1,22 @@
+# Requirements for Linxo Agent
+# Python 3.8+
+
+# Web Automation
+selenium==4.15.2
+webdriver-manager==4.0.1
+
+# HTTP Requests
+requests==2.31.0
+
+# Email (built-in, but listing for documentation)
+# smtplib - built-in
+# email - built-in
+
+# Data handling (built-in)
+# json - built-in
+# csv - built-in
+# datetime - built-in
+# pathlib - built-in
+
+# Additional utilities
+python-dotenv==1.0.0  # For environment variables management

@@ -1,0 +1,348 @@
+{
+  "depenses_fixes": [
+    {
+      "libelle": "CA CONSUMER FINANCE",
+      "compte": "LCL",
+      "identifiant": "SOFINCO",
+      "commentaire": "Rachat crédit",
+      "montant": 982.0,
+      "categorie": "CREDITS"
+    },
+    {
+      "libelle": "ECHEANCE PRET PERMANENT",
+      "compte": "LCL",
+      "identifiant": "LCL",
+      "commentaire": "Prêt renouvellable",
+      "montant": 64.0,
+      "categorie": "CREDITS"
+    },
+    {
+      "libelle": "THELEM ASSURANCES",
+      "compte": "LCL",
+      "identifiant": "THELEM",
+      "commentaire": "Assurance Leon",
+      "montant": 90.0,
+      "categorie": "VOITURE"
+    },
+    {
+      "libelle": "THELEM ASSURANCES",
+      "compte": "LCL",
+      "identifiant": "THELEM",
+      "commentaire": "Assurance Twingo",
+      "montant": 50.0,
+      "categorie": "VOITURE"
+    },
+    {
+      "libelle": "MOBILIZE",
+      "compte": "LCL",
+      "identifiant": "MOBILIZE",
+      "commentaire": "Loyer Twingo",
+      "montant": 223.0,
+      "categorie": "VOITURE"
+    },
+    {
+      "libelle": "DIAC",
+      "compte": "LCL",
+      "identifiant": "DIAC",
+      "commentaire": "Loyer Twingo (ancien nom)",
+      "montant": 223.0,
+      "categorie": "VOITURE"
+    },
+    {
+      "libelle": "VAG Finance",
+      "compte": "LCL",
+      "identifiant": "VAG Finance",
+      "commentaire": "Loyer Cupra Leon ST",
+      "montant": 353.0,
+      "categorie": "VOITURE"
+    },
+    {
+      "libelle": "ENGIE",
+      "compte": "LCL",
+      "identifiant": "GAZ - ENGIE",
+      "commentaire": "",
+      "montant": 133.0,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "EDF clients particuli",
+      "compte": "LCL",
+      "identifiant": "ELECTRICITE - EDF",
+      "commentaire": "",
+      "montant": 129.0,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "SGC GIVORS",
+      "compte": "LCL",
+      "identifiant": "EAU",
+      "commentaire": "",
+      "montant": 48.0,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "Free Telecom",
+      "compte": "LCL",
+      "identifiant": "FREE",
+      "commentaire": "Box + Netflix",
+      "montant": 48.0,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "PAYPAL *DISNEYP LUXEMBOURG",
+      "compte": "LCL",
+      "identifiant": "Disney Plus",
+      "commentaire": "",
+      "montant": 1.99,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "NOUSTRAL",
+      "compte": "LCL",
+      "identifiant": "NOUSTRAL",
+      "commentaire": "Syndic copropriété",
+      "montant": 30.32,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "GENERALI IARD SA",
+      "compte": "LCL",
+      "identifiant": "Accidents de la vie",
+      "commentaire": "",
+      "montant": 30.0,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "GENERALI IARD SA",
+      "compte": "LCL",
+      "identifiant": "Multirisque Habitation",
+      "commentaire": "",
+      "montant": 49.96,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "DIRECTION GENERALE DE",
+      "compte": "LCL",
+      "identifiant": "IMPOTS",
+      "commentaire": "Taxe Foncière",
+      "montant": 91.0,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "BLINK",
+      "compte": "hellobank",
+      "identifiant": "Alarme Vidéo",
+      "commentaire": "100 / An",
+      "montant": 8.33,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "AMAZON PRIME FR PAYLI2469664/",
+      "compte": "hellobank",
+      "identifiant": "AMAZON PRIME",
+      "commentaire": "69,99 / an",
+      "montant": 5.83,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "Bouygues Telecom",
+      "compte": "LCL",
+      "identifiant": "Tel Cath",
+      "commentaire": "B&You",
+      "montant": 12.99,
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "Bouygues Telecom",
+      "compte": "LCL",
+      "identifiant": "Tel Phil",
+      "commentaire": "B&You",
+      "montant": 8.99,
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "Bouygues Telecom",
+      "compte": "LCL",
+      "identifiant": "Tel Lise",
+      "commentaire": "B&You",
+      "montant": 9.99,
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "SOURCE",
+      "compte": "LCL",
+      "identifiant": "Tel Emma",
+      "commentaire": "Source",
+      "montant": 10.0,
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "Microsoft",
+      "compte": "LCL",
+      "identifiant": "Office 365",
+      "commentaire": "99 / an",
+      "montant": 8.25,
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "PAYPAL *OVH LUXEMBOURG",
+      "compte": "LCL",
+      "identifiant": "",
+      "commentaire": "27,30 / an",
+      "montant": 2.27,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "PREDICA",
+      "compte": "LCL",
+      "identifiant": "ASSURANCE",
+      "commentaire": "PREDICA",
+      "montant": 45.0,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "PREDICA",
+      "compte": "LCL",
+      "identifiant": "Assurance décès Phil",
+      "commentaire": "PREDICA (130,65 :TRIMESTRE)",
+      "montant": 32.66,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "PREDICA",
+      "compte": "LCL",
+      "identifiant": "Assurance décès Cath",
+      "commentaire": "PREDICA (87,10 :TRIMESTRE)",
+      "montant": 21.77,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "CFDT SCPVC",
+      "compte": "hellobank",
+      "identifiant": "CFDT",
+      "commentaire": "",
+      "montant": 24.51,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "Kereis France",
+      "compte": "LCL",
+      "identifiant": "Prêt Cath",
+      "commentaire": "KEREIS",
+      "montant": 39.61,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "Kereis France",
+      "compte": "LCL",
+      "identifiant": "Prêt Philippe",
+      "commentaire": "KEREIS",
+      "montant": 68.87,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "FRAIS BOURSO PROTECT MONO 10/2025",
+      "compte": "Boursobank",
+      "identifiant": "Cath",
+      "commentaire": "Assurance CB BOURSOBANK",
+      "montant": 0.99,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "FRAIS BOURSO PROTECT MONO 10/2025",
+      "compte": "Boursobank",
+      "identifiant": "Phil",
+      "commentaire": "Assurance CB BOURSOBANK",
+      "montant": 0.99,
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "COMMISSIONS HELLO PRIME",
+      "compte": "hellobank",
+      "identifiant": "Hello Prime",
+      "commentaire": "Frais Hello Prime",
+      "montant": 5.0,
+      "categorie": "Frais bancaires"
+    },
+    {
+      "libelle": "Emma PEREZ",
+      "compte": "LCL",
+      "identifiant": "SYTRAL SPL",
+      "commentaire": "",
+      "montant": 25.0,
+      "categorie": "Transport"
+    },
+    {
+      "libelle": "REG.RECETTE OURA",
+      "compte": "Boursobank",
+      "identifiant": "Transport en commun",
+      "commentaire": "Abonnement transport",
+      "montant": 96.1,
+      "categorie": "Transport"
+    },
+    {
+      "libelle": "SNCF-VOYAGEURS",
+      "compte": "Boursobank",
+      "identifiant": "Abonnement Philippe",
+      "commentaire": "Voyage",
+      "montant": 76.7,
+      "categorie": "Transport"
+    },
+    {
+      "libelle": "GENERALI VIE SA",
+      "compte": "Boursobank",
+      "identifiant": "Cath",
+      "commentaire": "AssuranceVie Gestion Rotschild",
+      "montant": 200.0,
+      "categorie": "Epargne"
+    },
+    {
+      "libelle": "GENERALI VIE SA",
+      "compte": "Boursobank",
+      "identifiant": "Phil",
+      "commentaire": "AssuranceVie Gestion Rotschild",
+      "montant": 400.0,
+      "categorie": "Epargne"
+    }
+  ],
+  "depenses_variables": [],
+  "revenus": [
+    {
+      "libelle": "SGC CALUIRE",
+      "compte": "LCL",
+      "identifiant": "Salaire Cath",
+      "commentaire": "Mairie St Genis",
+      "montant": 1800.0,
+      "categorie": "Revenus"
+    },
+    {
+      "libelle": "SGC GIVORS",
+      "compte": "LCL",
+      "identifiant": "Salaire Cath",
+      "commentaire": "Conseillère municipale",
+      "montant": 45.87,
+      "categorie": "Revenus"
+    },
+    {
+      "libelle": "SARL IT SPIRIT",
+      "compte": "LCL",
+      "identifiant": "Salaire Phil",
+      "commentaire": "IT SPIRIT",
+      "montant": 2900.0,
+      "categorie": "Revenus"
+    }
+  ],
+  "totaux": {
+    "credits": 1046.0,
+    "voiture": 716.0,
+    "maison": 577.7,
+    "communication": 50.22,
+    "assurances": 234.40000000000003,
+    "transport": 197.8,
+    "impots": 0.0,
+    "epargne": 600.0,
+    "total_depenses_fixes": 3422.12,
+    "total_revenus": 4745.87,
+    "budget_variable_max": 1323.7316666666666
+  }
+}

@@ -1,0 +1,227 @@
+================================================================================
+COMMANDES UTILES - SYSTÈME LINXO AVEC VALIDATION CSV
+================================================================================
+
+📅 Date: 9 octobre 2025
+✅ Version: v2_FIXED + Validation stricte
+
+================================================================================
+🚀 UTILISATION STANDARD
+================================================================================
+
+# Analyse du mois en cours avec envoi SMS/Email
+cd /home/ubuntu/linxo_agent
+python3 analyze_and_notify_v2_FIXED.py --period current_month
+
+# Mode test (dry-run) - Analyse sans envoi
+python3 analyze_and_notify_v2_FIXED.py --period current_month --dry-run
+
+# Analyse uniquement (pas de notifications)
+python3 analyze_and_notify_v2_FIXED.py --period current_month --no-notifications
+
+# Analyse du mois précédent
+python3 analyze_and_notify_v2_FIXED.py --period last_month
+
+# Analyse des 30 derniers jours
+python3 analyze_and_notify_v2_FIXED.py --period last_30_days
+
+================================================================================
+🧪 TESTS
+================================================================================
+
+# Tests automatisés complets
+cd /home/ubuntu/linxo_agent
+python3 test_validation_complete.py
+
+# Script de test bash (validation + analyse + notifications)
+./TEST_FINAL_VALIDATION.sh
+
+# Test SMS OVH uniquement
+python3 test_sms_ovh.py
+
+================================================================================
+📁 GESTION DES FICHIERS CSV
+================================================================================
+
+# Vérifier le fichier CSV actuel
+ls -lh /home/ubuntu/data/latest.csv
+head -20 /home/ubuntu/data/latest.csv
+
+# Copier un nouveau CSV depuis Downloads
+cp ~/Downloads/linxo_export.csv /home/ubuntu/data/latest.csv
+
+# Utiliser le CSV de test (octobre uniquement)
+cp /home/ubuntu/data/latest_octobre_only.csv /home/ubuntu/data/latest.csv
+
+# Restaurer le CSV historique complet (pour tests de rejet)
+cp /home/ubuntu/data/latest_backup_full_history.csv /home/ubuntu/data/latest.csv
+
+# Créer un CSV filtré pour un mois spécifique
+head -1 /home/ubuntu/data/latest.csv > /home/ubuntu/data/latest_filtered.csv
+awk -F'\t' 'NR>1 && $1 ~ /^(0[1-9]|[12][0-9]|3[01])\/10\/2025$/' /home/ubuntu/data/latest.csv >> /home/ubuntu/data/latest_filtered.csv
+
+================================================================================
+📊 CONSULTATION DES LOGS
+================================================================================
+
+# Voir le dernier log
+tail -100 $(ls -t /home/ubuntu/logs/analyze_notify_*.log | head -1)
+
+# Voir tous les logs récents
+ls -lt /home/ubuntu/logs/analyze_notify_*.log | head -10
+
+# Rechercher les erreurs dans les logs
+grep -i "error\|failed\|échoué" $(ls -t /home/ubuntu/logs/analyze_notify_*.log | head -1)
+
+# Voir les validations CSV dans les logs
+grep -A 10 "VALIDATION DU CSV" $(ls -t /home/ubuntu/logs/analyze_notify_*.log | head -1)
+
+# Voir les résultats d'analyse
+grep -A 20 "RÉSULTATS DE L'ANALYSE" $(ls -t /home/ubuntu/logs/analyze_notify_*.log | head -1)
+
+================================================================================
+📈 CONSULTATION DES RÉSULTATS JSON
+================================================================================
+
+# Voir le dernier résultat JSON
+cat $(ls -t /home/ubuntu/data/results_*.json | head -1) | jq .
+
+# Voir uniquement l'analyse
+cat $(ls -t /home/ubuntu/data/results_*.json | head -1) | jq .details.analysis
+
+# Voir uniquement les notifications
+cat $(ls -t /home/ubuntu/data/results_*.json | head -1) | jq .details.notifications
+
+# Voir le statut de cohérence
+cat $(ls -t /home/ubuntu/data/results_*.json | head -1) | jq .details.analysis.coherence_check
+
+================================================================================
+🔍 VÉRIFICATION DE LA CONFIGURATION
+================================================================================
+
+# Vérifier les credentials OVH/SMTP
+cat /home/ubuntu/.api_secret_infos/api_secrets.json | jq .
+
+# Vérifier la configuration Linxo
+cat /home/ubuntu/linxo_agent/config_linxo.json | jq .
+
+# Vérifier les dépenses récurrentes
+cat /home/ubuntu/linxo_agent/depenses_recurrentes.json | jq .
+
+================================================================================
+🧹 NETTOYAGE
+================================================================================
+
+# Supprimer les logs de plus de 30 jours
+find /home/ubuntu/logs -name "analyze_notify_*.log" -mtime +30 -delete
+
+# Supprimer les résultats JSON de plus de 30 jours
+find /home/ubuntu/data -name "results_*.json" -mtime +30 -delete
+
+# Lister les fichiers volumineux
+du -sh /home/ubuntu/logs/* | sort -h | tail -10
+du -sh /home/ubuntu/data/* | sort -h | tail -10
+
+================================================================================
+📚 DOCUMENTATION
+================================================================================
+
+# Lire la synthèse d'implémentation
+cat /home/ubuntu/linxo_agent/SYNTHESE_IMPLEMENTATION.md | less
+
+# Lire le rapport de validation
+cat /home/ubuntu/linxo_agent/RAPPORT_VALIDATION_CSV.md | less
+
+# Lire le guide d'utilisation
+cat /home/ubuntu/linxo_agent/GUIDE_UTILISATION_VALIDATION.md | less
+
+# Lire le résumé rapide
+cat /home/ubuntu/linxo_agent/README_VALIDATION.md | less
+
+# Ouvrir les PDFs (si disponibles)
+ls -lh /home/ubuntu/linxo_agent/*.pdf
+
+================================================================================
+🔧 DÉPANNAGE
+================================================================================
+
+# Vérifier que Python est installé
+python3 --version
+
+# Vérifier les dépendances Python
+pip3 list | grep -E "pandas|requests"
+
+# Tester la connexion SMTP
+python3 -c "import smtplib; print('SMTP OK')"
+
+# Vérifier les permissions des fichiers
+ls -la /home/ubuntu/linxo_agent/*.py
+ls -la /home/ubuntu/data/
+
+# Rendre les scripts exécutables
+chmod +x /home/ubuntu/linxo_agent/*.py
+chmod +x /home/ubuntu/linxo_agent/*.sh
+
+================================================================================
+📊 STATISTIQUES
+================================================================================
+
+# Compter les transactions dans le CSV
+wc -l /home/ubuntu/data/latest.csv
+
+# Voir les dates min/max dans le CSV
+awk -F'\t' 'NR>1 {print $1}' /home/ubuntu/data/latest.csv | sort | head -1
+awk -F'\t' 'NR>1 {print $1}' /home/ubuntu/data/latest.csv | sort | tail -1
+
+# Compter les transactions par mois
+awk -F'\t' 'NR>1 {split($1,a,"/"); print a[2]"/"a[3]}' /home/ubuntu/data/latest.csv | sort | uniq -c
+
+# Voir les catégories de dépenses
+awk -F'\t' 'NR>1 {print $3}' /home/ubuntu/data/latest.csv | sort | uniq -c | sort -rn | head -10
+
+================================================================================
+🔄 WORKFLOW COMPLET
+================================================================================
+
+# 1. Télécharger le CSV depuis Linxo (mois en cours uniquement)
+# 2. Copier le fichier
+cp ~/Downloads/linxo_export.csv /home/ubuntu/data/latest.csv
+
+# 3. Vérifier le fichier
+head -20 /home/ubuntu/data/latest.csv
+wc -l /home/ubuntu/data/latest.csv
+
+# 4. Test dry-run
+cd /home/ubuntu/linxo_agent
+python3 analyze_and_notify_v2_FIXED.py --period current_month --dry-run
+
+# 5. Si OK, lancer l'analyse réelle
+python3 analyze_and_notify_v2_FIXED.py --period current_month
+
+# 6. Vérifier les logs
+tail -100 $(ls -t /home/ubuntu/logs/analyze_notify_*.log | head -1)
+
+# 7. Vérifier les résultats
+cat $(ls -t /home/ubuntu/data/results_*.json | head -1) | jq .
+
+================================================================================
+📞 CONTACTS
+================================================================================
+
+SMS: +33626267421, +33611435899
+Email: phiperez@gmail.com, caliemphi@gmail.com
+
+================================================================================
+✅ AIDE RAPIDE
+================================================================================
+
+Problème: "CSV_VALIDATION_FAILED"
+Solution: Télécharger un nouveau CSV avec uniquement le mois en cours
+
+Problème: "No such file or directory"
+Solution: Vérifier que /home/ubuntu/data/latest.csv existe
+
+Problème: SMS/Email non envoyés
+Solution: Vérifier /home/ubuntu/.api_secret_infos/api_secrets.json
+
+================================================================================

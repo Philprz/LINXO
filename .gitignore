@@ -1,0 +1,79 @@
+# Environment and secrets
+.env
+api_secrets.json
+config_linxo.json
+*.json
+!depenses_recurrentes.json
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Selenium & Chrome
+chrome_linxo_profile/
+*.crx
+chromedriver*
+geckodriver*
+
+# Data files
+data/
+downloads/
+Uploads/
+Downloads/
+logs/
+reports/
+*.csv
+*.log
+*.txt
+!requirements.txt
+!COMMANDES_UTILES.txt
+
+# Backups
+BACKUP*/
+archive*/
+rapport_*.txt
+rapport_*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Documentation (keep only essentials)
+*.pdf
+RAPPORT_*.md
+CORRECTION_*.md
+SYNTHESE_*.md
+COMPARAISON_*.md
+CONFIG_FINALE.md
+E2E_*.md
+EXECUTIVE_*.md
