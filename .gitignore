@@ -48,7 +48,7 @@ reports/
 *.log
 *.txt
 !requirements.txt
-!COMMANDES_UTILES.txt
+!post-cleanup-checklist.txt
 
 # Backups
 BACKUP*/
@@ -68,6 +68,12 @@ rapport_*.json
 Thumbs.db
 desktop.ini
 
+# Generated outputs (cleanup artifacts)
+apercu_*.html
+apercu_*.txt
+DEPENDENCY_ANALYSIS.txt
+verification_report.md
+
 # Documentation (keep only essentials)
 *.pdf
 RAPPORT_*.md
@@ -77,3 +83,11 @@ COMPARAISON_*.md
 CONFIG_FINALE.md
 E2E_*.md
 EXECUTIVE_*.md
+CHANGELOG_V*.md
+README_V*.md
+QUICK_START_V*.md
+SUMMARY_*.md
+RESUME_*.md
+FICHIERS_*.md
+NETTOYAGE_*.md
+UPDATE_*.md
