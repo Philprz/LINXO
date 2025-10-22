@@ -1,0 +1,873 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.4;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background-color: white;
+        }
+        .header {
+            background: linear-gradient(135deg, #7c69ef 0%, #a78bfa 100%);
+            color: white;
+            padding: 35px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .header .date {
+            font-size: 15px;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 25px 30px;
+        }
+        .metric {
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        .metric-label {
+            color: #333;
+            margin-right: 8px;
+        }
+        .metric-value {
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .value-red { color: #dc3545; }
+        .value-green { color: #dc3545; }
+        .value-default { color: #333; }
+
+        .progress-section {
+            margin: 15px 0;
+        }
+        .progress-bar-container {
+            background-color: #e9ecef;
+            border-radius: 6px;
+            height: 28px;
+            position: relative;
+            width: 100%;
+            border: 1px solid #ddd;
+            overflow: visible;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            transition: width 0.3s ease;
+            border-radius: 5px 0 0 5px;
+        }
+        .progress-marker-100 {
+            position: absolute;
+            right: -2px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: #333;
+            z-index: 10;
+        }
+        .progress-marker-100::before {
+            content: '100%';
+            position: absolute;
+            right: -22px;
+            top: -24px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #333;
+            white-space: nowrap;
+        }
+
+        .conseil-box {
+            background-color: #fff9e6;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .conseil-box h3 {
+            font-size: 15px;
+            color: #856404;
+            margin-bottom: 8px;
+        }
+        .conseil-box p {
+            font-size: 13px;
+            color: #856404;
+            line-height: 1.5;
+            margin: 4px 0;
+        }
+        .section {
+            margin-top: 25px;
+        }
+        .section-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #7c69ef;
+            color: #333;
+        }
+        .section-title-icon {
+            margin-right: 6px;
+        }
+        .transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .transactions-table th {
+            background-color: #f8f9fa;
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .transactions-table td {
+            padding: 8px;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .transactions-table tr:last-child td {
+            border-bottom: none;
+        }
+        .transactions-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .td-date {
+            width: 85px;
+            color: #6c757d;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .td-category {
+            width: 140px;
+            color: #495057;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .td-label {
+            color: #333;
+            font-size: 13px;
+        }
+        .td-amount {
+            width: 90px;
+            text-align: right;
+            color: #dc3545;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Rapport Linxo - Budget</h1>
+            <div class="date">22/10/2025</div>
+        </div>
+
+        <div class="content">
+            <div class="metric">
+                <span class="metric-label">Frais fixes</span>
+                <span class="metric-value value-red">2844.95 €</span>
+                <span class="metric-label">/ 3650 €</span>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: 77.9%; background: linear-gradient(90deg, #28a745 0%, #28a745dd 100%);">
+                        78%
+                    </div>
+                    <div class="progress-marker-100"></div>
+                </div>
+            </div>
+
+            <div class="metric">
+                <span class="metric-label">Dépenses variables</span>
+                <span class="metric-value value-red">1390.07 €</span>
+                <span class="metric-label">/ 1300 €</span>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: 106.9%; background: linear-gradient(90deg, #dc3545 0%, #dc3545dd 100%);">
+                        107%
+                    </div>
+                    <div class="progress-marker-100"></div>
+                </div>
+            </div>
+
+            <div class="metric" style="margin-top: 15px;">
+                <span class="metric-label">Dépassement</span>
+                <span class="metric-value value-green">90.07 €</span>
+            </div>
+
+            <div class="conseil-box">
+                <h3>💡 Conseil de votre Agent Budget</h3>
+                <p>ALERTE BUDGET DEPASSE DE 90.07E !</p>
+                <p>Vous avez depense 107% de votre budget.</p>
+                <p>Il reste 9 jours dans le mois.</p>
+                <p>RECOMMANDATION : Limitez au maximum les depenses non essentielles !</p>
+
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <span class="section-title-icon">🔒</span>
+                    Dépenses fixes (30 transactions)
+                </div>
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th class="td-date">Date</th>
+                            <th class="td-category">Catégorie</th>
+                            <th class="td-label">Libellé</th>
+                            <th class="td-amount">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td class="td-date">10/10/2025</td>
+                            <td class="td-category">CREDITS</td>
+                            <td class="td-label">CA CONSUMER FINANCE</td>
+                            <td class="td-amount">-982.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">10/10/2025</td>
+                            <td class="td-category">Epargne</td>
+                            <td class="td-label">GENERALI VIE SA</td>
+                            <td class="td-amount">-400.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">10/10/2025</td>
+                            <td class="td-category">VOITURE</td>
+                            <td class="td-label">DIAC</td>
+                            <td class="td-amount">-222.98 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">10/10/2025</td>
+                            <td class="td-category">Epargne</td>
+                            <td class="td-label">GENERALI VIE SA</td>
+                            <td class="td-amount">-200.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">ENGIE</td>
+                            <td class="td-amount">-124.05 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">EDF clients particuli</td>
+                            <td class="td-amount">-117.14 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">02/10/2025</td>
+                            <td class="td-category">Transport</td>
+                            <td class="td-label">REG.RECETTE OURA</td>
+                            <td class="td-amount">-96.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">16/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">DIRECTION GENERALE DE</td>
+                            <td class="td-amount">-91.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">01/10/2025</td>
+                            <td class="td-category">Transport</td>
+                            <td class="td-label">SNCF-VOYAGEURS</td>
+                            <td class="td-amount">-76.70 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">VOITURE</td>
+                            <td class="td-label">THELEM ASSURANCES</td>
+                            <td class="td-amount">-74.95 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Assurances</td>
+                            <td class="td-label">Kereis France</td>
+                            <td class="td-amount">-68.87 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">GENERALI IARD SA</td>
+                            <td class="td-amount">-49.96 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">10/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">SGC GIVORS</td>
+                            <td class="td-amount">-48.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">Free Telecom</td>
+                            <td class="td-amount">-47.98 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">08/10/2025</td>
+                            <td class="td-category">Assurances</td>
+                            <td class="td-label">PREDICA</td>
+                            <td class="td-amount">-45.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">14/10/2025</td>
+                            <td class="td-category">Transport</td>
+                            <td class="td-label">VIREMENT  VIR SEPA Emma PEREZ Remboursement CROUS   SCA528750373193</td>
+                            <td class="td-amount">-40.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Assurances</td>
+                            <td class="td-label">Kereis France</td>
+                            <td class="td-amount">-39.61 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">GENERALI IARD SA</td>
+                            <td class="td-amount">-29.69 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">05/10/2025</td>
+                            <td class="td-category">Transport</td>
+                            <td class="td-label">Emma PEREZ</td>
+                            <td class="td-amount">-25.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">COMMUNICATION</td>
+                            <td class="td-label">Bouygues Telecom</td>
+                            <td class="td-amount">-12.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">13/10/2025</td>
+                            <td class="td-category">COMMUNICATION</td>
+                            <td class="td-label">SOURCE</td>
+                            <td class="td-amount">-10.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">COMMUNICATION</td>
+                            <td class="td-label">Bouygues Telecom</td>
+                            <td class="td-amount">-9.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">COMMUNICATION</td>
+                            <td class="td-label">Bouygues Telecom</td>
+                            <td class="td-amount">-8.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">PAYPAL *OVH LUXEMBOURG</td>
+                            <td class="td-amount">-7.20 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">PAYPAL *OVH LUXEMBOURG</td>
+                            <td class="td-amount">-5.39 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">02/10/2025</td>
+                            <td class="td-category">Frais bancaires</td>
+                            <td class="td-label">COMMISSIONS HELLO PRIME- COTISATION A UNE OFFRE GROUPEE DE SERVICES</td>
+                            <td class="td-amount">-5.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">PAYPAL *OVH LUXEMBOURG</td>
+                            <td class="td-amount">-2.39 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">MAISON</td>
+                            <td class="td-label">PAYPAL *DISNEYP LUXEMBOURG</td>
+                            <td class="td-amount">-1.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">07/10/2025</td>
+                            <td class="td-category">Assurances</td>
+                            <td class="td-label">FRAIS BOURSO PROTECT MONO 10/2025</td>
+                            <td class="td-amount">-0.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">07/10/2025</td>
+                            <td class="td-category">Assurances</td>
+                            <td class="td-label">FRAIS BOURSO PROTECT MONO 10/2025</td>
+                            <td class="td-amount">-0.99 €</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <span class="section-title-icon">📋</span>
+                    Dépenses variables détaillées (53 transactions)
+                </div>
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th class="td-date">Date</th>
+                            <th class="td-category">Catégorie</th>
+                            <th class="td-label">Libellé</th>
+                            <th class="td-amount">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        <tr>
+                            <td class="td-date">04/10/2025</td>
+                            <td class="td-category">Animaux</td>
+                            <td class="td-label">CLINIQUE VETERI\SAINT-GENIS-L\ FR</td>
+                            <td class="td-amount">-324.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">INTERMARCHE</td>
+                            <td class="td-amount">-198.03 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">13/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">INTERMARCHE</td>
+                            <td class="td-amount">-121.55 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">13/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">LIDL GRIGNY</td>
+                            <td class="td-amount">-88.08 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">04/10/2025</td>
+                            <td class="td-category">Coiffeur, esthétique, cosmétique, soins</td>
+                            <td class="td-label">XTHIOLLIERE\SAINT GENIS L\ FR</td>
+                            <td class="td-amount">-77.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">13/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">AMAZON EU SARL</td>
+                            <td class="td-amount">-50.29 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">16/10/2025</td>
+                            <td class="td-category">Travaux, déco, jardin</td>
+                            <td class="td-label">ADEO*LEROY MERLIN</td>
+                            <td class="td-amount">-38.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">14/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">PayPal Europe S.a.r.l</td>
+                            <td class="td-amount">-33.22 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Frais, remb santé</td>
+                            <td class="td-label">PHARMACIE DU GAREL</td>
+                            <td class="td-amount">-28.80 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">13/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">TDLV DISTRIBUTIO</td>
+                            <td class="td-amount">-28.40 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Animaux</td>
+                            <td class="td-label">PAYPAL *PACHA LUXEMBOURG</td>
+                            <td class="td-amount">-25.84 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">PAYPAL *PAIEMEN LU LUXEMBOURG</td>
+                            <td class="td-amount">-23.25 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Abonnement AI</td>
+                            <td class="td-label">OPENAI *CHATGPT D01 YC43 DUBL</td>
+                            <td class="td-amount">-23.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Abonnement AI</td>
+                            <td class="td-label">CLAUDE.AI SUBSC</td>
+                            <td class="td-amount">-21.60 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">09/10/2025</td>
+                            <td class="td-category">Frais, remb santé</td>
+                            <td class="td-label">BELLETON</td>
+                            <td class="td-amount">-20.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Musique, livres, films</td>
+                            <td class="td-label">PAYPAL *FNAC DI LUXEMBOURG</td>
+                            <td class="td-amount">-19.95 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">20/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">TDLV DISTRIBUTIO</td>
+                            <td class="td-amount">-19.89 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">21/10/2025</td>
+                            <td class="td-category">Frais, remb santé</td>
+                            <td class="td-label">PHARMACIE DU GAREL</td>
+                            <td class="td-amount">-19.80 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">13/10/2025</td>
+                            <td class="td-category">Restaurants, soirées</td>
+                            <td class="td-label">SARL A LA NICHE</td>
+                            <td class="td-amount">-18.90 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">16/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">LIDL VILLEFRANCHE S</td>
+                            <td class="td-amount">-16.78 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">20/10/2025</td>
+                            <td class="td-category">A catégoriser</td>
+                            <td class="td-label">AMZN Mktp FR*OH1Q44CK5</td>
+                            <td class="td-amount">-15.98 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">17/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">H3F</td>
+                            <td class="td-amount">-13.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">17/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">AMAZON EU SARL</td>
+                            <td class="td-amount">-12.61 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">03/10/2025</td>
+                            <td class="td-category">Restaurants, soirées</td>
+                            <td class="td-label">CHIKIN PART DIE</td>
+                            <td class="td-amount">-11.70 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Bitcoins</td>
+                            <td class="td-label">BITSTACK 100 IMPASSE D</td>
+                            <td class="td-amount">-11.14 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">01/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">AMAZON EU SARL</td>
+                            <td class="td-amount">-10.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Bitcoins</td>
+                            <td class="td-label">BITSTACK 100 IMPASSE D</td>
+                            <td class="td-amount">-10.11 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Bitcoins</td>
+                            <td class="td-label">BITSTACK 100 IMPASSE D</td>
+                            <td class="td-amount">-10.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Bitcoins</td>
+                            <td class="td-label">BITSTACK 100 IMPASSE D</td>
+                            <td class="td-amount">-10.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Bitcoins</td>
+                            <td class="td-label">BITSTACK 100 IMPASSE D</td>
+                            <td class="td-amount">-10.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">03/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">AMAZON EU SARL</td>
+                            <td class="td-amount">-8.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Bitcoins</td>
+                            <td class="td-label">BITSTACK 100 IMPASSE D</td>
+                            <td class="td-amount">-8.87 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">17/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">CARREFOUR CONT</td>
+                            <td class="td-amount">-7.68 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">14/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">GRAND FRAIS VILLEFR</td>
+                            <td class="td-amount">-7.68 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">15/10/2025</td>
+                            <td class="td-category">Parking, péages, PV</td>
+                            <td class="td-label">APRR</td>
+                            <td class="td-amount">-6.90 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">14/10/2025</td>
+                            <td class="td-category">Shopping/e-Commerce</td>
+                            <td class="td-label">PayPal Europe S.a.r.l</td>
+                            <td class="td-amount">-6.45 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Services</td>
+                            <td class="td-label">PAYPAL *SENDINB LUXEMBOURG</td>
+                            <td class="td-amount">-6.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">31/10/2025</td>
+                            <td class="td-category">Services</td>
+                            <td class="td-label">PAYPAL *UBER BV LUXEMBOURG</td>
+                            <td class="td-amount">-5.99 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">21/10/2025</td>
+                            <td class="td-category">Electronique, multimédia</td>
+                            <td class="td-label">CDISCOUNT</td>
+                            <td class="td-amount">-5.07 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">21/10/2025</td>
+                            <td class="td-category">Alimentation, supermarché</td>
+                            <td class="td-label">SELECTA SAS</td>
+                            <td class="td-amount">-2.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">20/10/2025</td>
+                            <td class="td-category">Parking, péages, PV</td>
+                            <td class="td-label">LPA</td>
+                            <td class="td-amount">-2.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.40 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.30 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">06/10/2025</td>
+                            <td class="td-category">Snacks, repas au travail</td>
+                            <td class="td-label">MAXICOFFEE ARA</td>
+                            <td class="td-amount">-1.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">07/10/2025</td>
+                            <td class="td-category">Garage, parking privé</td>
+                            <td class="td-label">CLI. RADIO CHARC</td>
+                            <td class="td-amount">-1.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">05/10/2025</td>
+                            <td class="td-category">Garage, parking privé</td>
+                            <td class="td-label">CLI. RADIO CHARC\STE FOY LES L\ FR</td>
+                            <td class="td-amount">-1.00 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">07/10/2025</td>
+                            <td class="td-category">Intérêts</td>
+                            <td class="td-label">*INTERETS DEBITEURS AU 30/09/25</td>
+                            <td class="td-amount">-0.11 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">07/10/2025</td>
+                            <td class="td-category">Intérêts</td>
+                            <td class="td-label">*INTERETS DEBITEURS AU 30/09/25</td>
+                            <td class="td-amount">-0.10 €</td>
+                        </tr>
+
+                        <tr>
+                            <td class="td-date">07/10/2025</td>
+                            <td class="td-category">Intérêts</td>
+                            <td class="td-label">*INTERETS DEBITEURS AU 30/09/25</td>
+                            <td class="td-amount">-0.02 €</td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+
+        <div class="footer">
+            🤖 Rapport généré automatiquement par votre Agent Linxo
+        </div>
+    </div>
+</body>
+</html>

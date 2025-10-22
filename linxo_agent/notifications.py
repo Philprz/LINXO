@@ -17,9 +17,11 @@ import sys
 # Import du module de configuration unifié
 try:
     from config import get_config
+    from report_formatter_v2 import formater_email_html_v2, formater_sms_v2
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from config import get_config
+    from report_formatter_v2 import formater_email_html_v2, formater_sms_v2
 
 
 class NotificationManager:
@@ -29,15 +31,16 @@ class NotificationManager:
         """Initialise le gestionnaire avec la configuration"""
         self.config = get_config()
 
-    def send_email(self, subject, body, recipients=None, attachment_path=None):
+    def send_email(self, subject, body, recipients=None, attachment_path=None, is_html=False):
         """
         Envoie un email via SMTP Gmail
 
         Args:
             subject: Sujet de l'email
-            body: Corps de l'email (texte)
+            body: Corps de l'email (texte ou HTML)
             recipients: Liste d'adresses email (optionnel, utilise config par défaut)
             attachment_path: Chemin vers une pièce jointe (optionnel)
+            is_html: True si le body est en HTML
 
         Returns:
             bool: True si envoi réussi, False sinon
@@ -62,7 +65,10 @@ class NotificationManager:
             msg['To'] = ', '.join(recipients)
 
             # Ajouter le corps du message
-            body_part = MIMEText(body, 'plain', 'utf-8')
+            if is_html:
+                body_part = MIMEText(body, 'html', 'utf-8')
+            else:
+                body_part = MIMEText(body, 'plain', 'utf-8')
             msg.attach(body_part)
 
             # Ajouter une pièce jointe si fournie
@@ -167,6 +173,7 @@ class NotificationManager:
     def send_budget_notification(self, analysis_result):
         """
         Envoie les notifications (email + SMS) pour le rapport budgétaire
+        Utilise le nouveau format visuel et épuré
 
         Args:
             analysis_result: Résultat de l'analyse budgétaire (dict)
@@ -174,6 +181,9 @@ class NotificationManager:
         Returns:
             dict: Résultats de l'envoi (email et SMS)
         """
+        from datetime import datetime
+        from analyzer import generer_conseil_budget
+
         print("\n[NOTIFICATION] Preparation des notifications...")
 
         # Extraire les données
@@ -182,60 +192,22 @@ class NotificationManager:
         reste = budget_max - total_depenses
         pourcentage = (total_depenses / budget_max * 100) if budget_max > 0 else 0
 
-        # Déterminer le statut
-        if reste < 0:
-            emoji = "[ROUGE]"
-            statut = "ALERTE - BUDGET DEPASSE"
-            alerte = True
-        elif pourcentage >= 80:
-            emoji = "[ORANGE]"
-            statut = "ATTENTION"
-            alerte = False
-        else:
-            emoji = "[VERT]"
-            statut = "OK"
-            alerte = False
+        # Générer le conseil personnalisé
+        conseil = generer_conseil_budget(total_depenses, budget_max)
 
-        # Préparer le message SMS
-        if alerte:
-            sms_msg = f"[ALERTE BUDGET!]\n"
-            sms_msg += f"Depense: {total_depenses:.0f}E / {budget_max:.0f}E\n"
-            sms_msg += f"DEPASSEMENT: {abs(reste):.0f}E"
-        elif emoji == "[ORANGE]":
-            sms_msg = f"[ATTENTION Budget]\n"
-            sms_msg += f"Depense: {total_depenses:.0f}E / {budget_max:.0f}E ({pourcentage:.0f}%)\n"
-            sms_msg += f"Reste: {reste:.0f}E"
-        else:
-            sms_msg = f"[Budget OK]\n"
-            sms_msg += f"Depense: {total_depenses:.0f}E / {budget_max:.0f}E ({pourcentage:.0f}%)\n"
-            sms_msg += f"Reste: {reste:.0f}E"
+        # Préparer le message SMS avec le nouveau format
+        sms_msg = formater_sms_v2(total_depenses, budget_max, reste, pourcentage)
 
-        # Préparer l'email
-        from datetime import datetime
-        email_body = analysis_result.get('rapport', f"""RAPPORT LINXO - {datetime.now().strftime('%d/%m/%Y %H:%M')}
-================================================================================
-
-RESUME DES DEPENSES
-================================================================================
-
-Budget mensuel: {budget_max:.2f}E
-Depenses totales: {total_depenses:.2f}E
-Reste disponible: {reste:.2f}E
-Pourcentage utilise: {pourcentage:.1f}%
-
-Statut: {emoji} {statut}
-
-================================================================================
-Rapport genere automatiquement par l'Agent Linxo
-""")
+        # Préparer l'email HTML avec le nouveau format
+        email_body_html = formater_email_html_v2(analysis_result, budget_max, conseil)
 
         # Sujet de l'email
-        if alerte:
-            email_subject = f"[ALERTE BUDGET] - Depassement de {abs(reste):.0f}E !"
-        elif emoji == "[ORANGE]":
-            email_subject = f"[ATTENTION Budget] - {pourcentage:.0f}% utilise"
+        if reste < 0:
+            email_subject = f"🔴 ALERTE Budget - Dépassement de {abs(reste):.0f}€"
+        elif pourcentage >= 80:
+            email_subject = f"🟠 Budget à {pourcentage:.0f}% - Attention"
         else:
-            email_subject = f"[Budget OK] - Rapport Linxo {datetime.now().strftime('%d/%m/%Y')}"
+            email_subject = f"🟢 Rapport Budget - {datetime.now().strftime('%d/%m/%Y')}"
 
         # Envoyer les notifications
         results = {}
@@ -247,7 +219,12 @@ Rapport genere automatiquement par l'Agent Linxo
         # Email
         print("\n[EMAIL] Envoi des emails...")
         csv_path = analysis_result.get('csv_path')
-        results['email'] = self.send_email(email_subject, email_body, attachment_path=csv_path)
+        results['email'] = self.send_email(
+            email_subject,
+            email_body_html,
+            attachment_path=csv_path,
+            is_html=True
+        )
 
         return results
 
