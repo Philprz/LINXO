@@ -1,0 +1,108 @@
+# KEEP LIST - Files to retain
+# These files are essential for the application to function
+
+.env.example
+  Reason: Configuration/dependency file
+
+.gitignore
+  Reason: Configuration/dependency file
+
+00_COMMENCER_ICI.md
+  Reason: Essential documentation
+
+GUIDE_DEPLOIEMENT_VPS.md
+  Reason: Essential documentation
+
+LANCEMENT_RAPIDE.md
+  Reason: Essential documentation
+
+README.md
+  Reason: Essential documentation
+
+START_HERE.md
+  Reason: Essential documentation
+
+api_secrets.json
+  Reason: Runtime configuration file
+
+deploy/api_secrets.json.example
+  Reason: Template/example file for deployment
+
+deploy/cleanup.sh
+  Reason: Deployment script
+
+deploy/config_linxo.json.example
+  Reason: Template/example file for deployment
+
+deploy/install_vps.sh
+  Reason: Deployment script
+
+deploy/prepare_deployment.sh
+  Reason: Deployment script
+
+deploy/setup_ssl.sh
+  Reason: Deployment script
+
+generate_preview.py
+  Reason: Entry point script (has __main__)
+
+linxo_agent.py
+  Reason: Entry point script (has __main__)
+
+linxo_agent/agent_linxo_csv_v3_RELIABLE.py
+  Reason: Core application module
+
+linxo_agent/analyzer.py
+  Reason: Core application module
+
+linxo_agent/config.py
+  Reason: Core application module
+
+linxo_agent/config_linxo.json
+  Reason: Runtime configuration file
+
+linxo_agent/depenses_recurrentes.json
+  Reason: Runtime configuration file
+
+linxo_agent/linxo_connexion.py
+  Reason: Core application module
+
+linxo_agent/notifications.py
+  Reason: Core application module
+
+linxo_agent/report_formatter_v2.py
+  Reason: Core application module
+
+linxo_agent/run_analysis.py
+  Reason: Core application module
+
+linxo_agent/run_linxo_e2e.py
+  Reason: Core application module
+
+requirements.txt
+  Reason: Configuration/dependency file
+
+test_analyzer.py
+  Reason: Entry point script (has __main__)
+
+test_envoi_nouveaux_formats.py
+  Reason: Entry point script (has __main__)
+
+test_new_format.py
+  Reason: Entry point script (has __main__)
+
+test_preview_notifications.py
+  Reason: Entry point script (has __main__)
+
+test_send_notifications.py
+  Reason: Entry point script (has __main__)
+
+test_sms_debug.py
+  Reason: Entry point script (has __main__)
+
+test_sms_direct.py
+  Reason: Entry point script (has __main__)
+
+test_sms_only.py
+  Reason: Entry point script (has __main__)
+

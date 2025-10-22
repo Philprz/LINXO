@@ -1,0 +1,33 @@
+# REVIEW LIST - Files needing manual verification
+# These files require validation before deciding to keep or remove
+
+.claude/settings.local.json
+  Reason: Claude IDE settings (user-specific, consider keeping)
+
+.env
+  Reason: Uncategorized - needs manual review
+
+DEPENDENCY_ANALYSIS.txt
+  Reason: Documentation - verify relevance
+
+Downloads/operations.csv
+  Reason: Data directory file - check if needed for tests/demos
+
+data/latest.csv
+  Reason: Data directory file - check if needed for tests/demos
+
+linxo_agent/COMMANDES_UTILES.txt
+  Reason: Documentation - verify relevance
+
+linxo_agent/README_V3_RELIABLE.md
+  Reason: Documentation - verify relevance
+
+linxo_agent/generate_api_secrets.py
+  Reason: Generation script - verify usage
+
+tools/classify_files.py
+  Reason: Uncategorized - needs manual review
+
+tools/dependency_analyzer.py
+  Reason: Uncategorized - needs manual review
+
