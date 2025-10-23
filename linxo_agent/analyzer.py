@@ -108,12 +108,27 @@ def est_depense_recurrente(transaction, depenses_fixes):
         if exception in libelle_upper:
             return False, None
 
+    # RÈGLE SPÉCIALE: Exclure les virements avec mots-clés ponctuels
+    mots_cles_ponctuels = ['REMBOURSEMENT', 'REMBOURSE', 'AVANCE', 'PRET']
+    if 'VIR' in libelle_upper or 'VIREMENT' in libelle_upper:
+        for mot_cle in mots_cles_ponctuels:
+            if mot_cle in libelle_upper:
+                # C'est un virement ponctuel (remboursement, avance, etc.)
+                return False, None
+
     # Méthode 1: Matching avec le fichier depenses_recurrentes.json
     for depense_fixe in depenses_fixes:
         pattern_libelle = depense_fixe.get('libelle', '').upper()
+        identifiant = depense_fixe.get('identifiant', '').upper()
 
         # Si le pattern est présent dans le libellé de la transaction
         if pattern_libelle and pattern_libelle in libelle_upper:
+            # Vérification supplémentaire avec identifiant si fourni
+            if identifiant and identifiant not in libelle_upper:
+                # Le pattern correspond mais pas l'identifiant précis
+                # Éviter les faux positifs (ex: "Emma PEREZ" vs "VIREMENT Emma PEREZ")
+                continue
+
             return True, {
                 'nom': depense_fixe.get('libelle', 'Depense fixe'),
                 'categorie': depense_fixe.get('categorie', 'Non classe')

@@ -187,9 +187,25 @@
     {
       "libelle": "PAYPAL *OVH LUXEMBOURG",
       "compte": "LCL",
-      "identifiant": "",
-      "commentaire": "27,30 / an",
-      "montant": 2.27,
+      "identifiant": "OVH VPS",
+      "commentaire": "VPS Cloud 7.20",
+      "montant": 7.20,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "PAYPAL *OVH LUXEMBOURG",
+      "compte": "LCL",
+      "identifiant": "OVH Domaine",
+      "commentaire": "Domaine 5.39",
+      "montant": 5.39,
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "PAYPAL *OVH LUXEMBOURG",
+      "compte": "LCL",
+      "identifiant": "OVH Email",
+      "commentaire": "Email Pro 2.39",
+      "montant": 2.39,
       "categorie": "MAISON"
     },
     {
@@ -268,7 +284,7 @@
       "libelle": "Emma PEREZ",
       "compte": "LCL",
       "identifiant": "SYTRAL SPL",
-      "commentaire": "",
+      "commentaire": "Abonnement transport Emma (NE PAS confondre avec remboursement CROUS)",
       "montant": 25.0,
       "categorie": "Transport"
     },
