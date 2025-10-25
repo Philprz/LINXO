@@ -120,19 +120,37 @@ def est_depense_recurrente(transaction, depenses_fixes):
     for depense_fixe in depenses_fixes:
         pattern_libelle = depense_fixe.get('libelle', '').upper()
         identifiant = depense_fixe.get('identifiant', '').upper()
+        montant_reference = depense_fixe.get('montant', 0)
 
         # Si le pattern est présent dans le libellé de la transaction
         if pattern_libelle and pattern_libelle in libelle_upper:
-            # Vérification supplémentaire avec identifiant si fourni
+            # Vérification supplémentaire avec identifiant si fourni ET présent dans le libellé
+            if identifiant and identifiant in libelle_upper:
+                # Le libellé ET l'identifiant correspondent : c'est un match parfait
+                return True, {
+                    'nom': depense_fixe.get('libelle', 'Depense fixe'),
+                    'categorie': depense_fixe.get('categorie', 'Non classe')
+                }
+
+            # Si pas d'identifiant dans le libellé, vérifier le montant pour différencier
             if identifiant and identifiant not in libelle_upper:
-                # Le pattern correspond mais pas l'identifiant précis
-                # Éviter les faux positifs (ex: "Emma PEREZ" vs "VIREMENT Emma PEREZ")
+                montant_transaction = abs(transaction.get('montant', 0))
+                # Tolérance de 5% sur le montant pour gérer les variations
+                if montant_reference > 0 and abs(montant_transaction - montant_reference) / montant_reference <= 0.05:
+                    # Le libellé correspond et le montant est proche : c'est un match
+                    return True, {
+                        'nom': depense_fixe.get('libelle', 'Depense fixe'),
+                        'categorie': depense_fixe.get('categorie', 'Non classe')
+                    }
+                # Sinon, continuer la recherche (peut-être une autre règle correspondra mieux)
                 continue
 
-            return True, {
-                'nom': depense_fixe.get('libelle', 'Depense fixe'),
-                'categorie': depense_fixe.get('categorie', 'Non classe')
-            }
+            # Si pas d'identifiant défini, le libellé seul suffit
+            if not identifiant:
+                return True, {
+                    'nom': depense_fixe.get('libelle', 'Depense fixe'),
+                    'categorie': depense_fixe.get('categorie', 'Non classe')
+                }
 
     # Méthode 2: Si le label contient 'Récurrent' (fallback)
     labels = transaction.get('labels', '')

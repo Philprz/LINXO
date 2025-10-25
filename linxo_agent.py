@@ -13,17 +13,19 @@ Ce script orchestre l'ensemble du processus:
 
 import sys
 import argparse
+import traceback
 from pathlib import Path
 from datetime import datetime
 
-# Ajouter le répertoire linxo_agent au path
-sys.path.insert(0, str(Path(__file__).parent / 'linxo_agent'))
-
 # Imports des modules refactorisés
-from config import get_config, reload_config
-from linxo_connexion import initialiser_driver_linxo, se_connecter_linxo, telecharger_csv_linxo
-from analyzer import analyser_csv
-from notifications import NotificationManager
+from linxo_agent.config import get_config
+from linxo_agent.linxo_connexion import (
+    initialiser_driver_linxo,
+    se_connecter_linxo,
+    telecharger_csv_linxo,
+)
+from linxo_agent.analyzer import analyser_csv
+from linxo_agent.notifications import NotificationManager
 
 
 def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=None):
@@ -57,6 +59,7 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
     config.print_summary()
 
     driver = None
+    analysis_result = None
 
     try:
         # ÉTAPE 1: Téléchargement du CSV
@@ -89,7 +92,6 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
 
             except Exception as e:
                 print(f"[ERREUR] Erreur durant le telechargement: {e}")
-                import traceback
                 traceback.print_exc()
                 return results
 
@@ -99,7 +101,7 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                     try:
                         driver.quit()
                         print("[INFO] Navigateur ferme")
-                    except:
+                    except Exception:
                         pass
 
         else:
@@ -121,7 +123,7 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
             analysis_result = analyser_csv(results['csv_path'])
 
             if analysis_result:
-                print(f"\n[SUCCESS] Analyse terminee!")
+                print("\n[SUCCESS] Analyse terminee!")
                 print(f"  Transactions: {analysis_result['total_transactions']}")
                 print(f"  Depenses variables: {analysis_result['total_variables']:.2f}E")
                 print(f"  Budget: {analysis_result['budget_max']:.2f}E")
@@ -139,7 +141,6 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
 
         except Exception as e:
             print(f"[ERREUR] Erreur durant l'analyse: {e}")
-            import traceback
             traceback.print_exc()
             return results
 
@@ -154,20 +155,21 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 notif_results = notification_manager.send_budget_notification(analysis_result)
 
                 # Vérifier les résultats
-                sms_ok = any(notif_results.get('sms', {}).values())
+                sms_results = notif_results.get('sms', {})
+                sms_ok = any(sms_results.values())
                 email_ok = notif_results.get('email', False)
 
                 if sms_ok or email_ok:
-                    print(f"\n[SUCCESS] Notifications envoyees!")
+                    print("\n[SUCCESS] Notifications envoyees!")
                     print(f"  Email: {'OK' if email_ok else 'ECHEC'}")
-                    print(f"  SMS: {sum(notif_results.get('sms', {}).values())} / {len(notif_results.get('sms', {}))}")
+                    sms_sent = sum(sms_results.values())
+                    print(f"  SMS: {sms_sent} / {len(sms_results)}")
                     results['notification_success'] = True
                 else:
                     print("[WARNING] Aucune notification n'a pu etre envoyee")
 
             except Exception as e:
                 print(f"[ERREUR] Erreur durant l'envoi des notifications: {e}")
-                import traceback
                 traceback.print_exc()
 
         else:
@@ -184,12 +186,12 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
         print("=" * 80)
 
         # Sauvegarder le rapport
-        if results['analysis_result']:
+        if analysis_result:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             rapport_file = config.reports_dir / f"rapport_linxo_{timestamp}.txt"
 
             with open(rapport_file, 'w', encoding='utf-8') as f:
-                f.write(results['analysis_result']['rapport'])
+                f.write(analysis_result['rapport'])
 
             print(f"\nRapport sauvegarde: {rapport_file}")
 
@@ -200,18 +202,17 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
         if driver:
             try:
                 driver.quit()
-            except:
+            except Exception:
                 pass
         return results
 
     except Exception as e:
         print(f"\n[ERREUR FATALE] Erreur inattendue: {e}")
-        import traceback
         traceback.print_exc()
         if driver:
             try:
                 driver.quit()
-            except:
+            except Exception:
                 pass
         return results
 
