@@ -3,10 +3,10 @@
 # À exécuter tous les jours à 10h via cron
 
 # Configuration
-LOG_DIR="/home/ubuntu/linxo_agent/logs"
+SCRIPT_DIR="/home/linxo/LINXO"
+LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/daily_report_$(date +%Y%m%d).log"
-SCRIPT_DIR="/home/ubuntu/linxo_agent"
-PYTHON_PATH="/usr/bin/python3"
+VENV_PATH="$SCRIPT_DIR/.venv"
 
 # Créer le répertoire de logs si nécessaire
 mkdir -p "$LOG_DIR"
@@ -26,13 +26,16 @@ cd "$SCRIPT_DIR" || {
     exit 1
 }
 
-# Activer l'environnement virtuel si vous en utilisez un
-# Décommentez la ligne suivante si vous avez un virtualenv
-# source /home/ubuntu/linxo_agent/venv/bin/activate
+# Activer l'environnement virtuel
+echo "🔧 Activation de l'environnement virtuel..."
+source "$VENV_PATH/bin/activate" || {
+    echo "❌ Erreur: Impossible d'activer l'environnement virtuel"
+    exit 1
+}
 
 # Exécuter le script d'analyse
 echo "🚀 Lancement de l'analyse..."
-$PYTHON_PATH run_analysis.py
+python linxo_agent/run_analysis.py
 
 # Vérifier le code de retour
 if [ $? -eq 0 ]; then

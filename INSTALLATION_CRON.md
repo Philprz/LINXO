@@ -2,8 +2,8 @@
 
 ## 📋 Prérequis
 - Accès SSH à votre VPS
-- Les fichiers du projet dans `/home/ubuntu/linxo_agent/`
-- Python 3 installé
+- Les fichiers du projet dans `/home/linxo/LINXO/`
+- Python 3 installé avec environnement virtuel `.venv`
 
 ## 🚀 Étapes d'installation
 
@@ -12,19 +12,19 @@
 Depuis votre machine locale, transférez le script :
 
 ```bash
-scp run_daily_report.sh ubuntu@VOTRE_VPS_IP:/home/ubuntu/linxo_agent/
+scp run_daily_report.sh linxo@VOTRE_VPS_IP:/home/linxo/LINXO/
 ```
 
 ### 2. Connectez-vous au VPS
 
 ```bash
-ssh ubuntu@VOTRE_VPS_IP
+ssh linxo@VOTRE_VPS_IP
 ```
 
 ### 3. Rendre le script exécutable
 
 ```bash
-cd /home/ubuntu/linxo_agent
+cd ~/LINXO
 chmod +x run_daily_report.sh
 ```
 
@@ -47,7 +47,7 @@ crontab -e
 Ajoutez cette ligne pour exécuter le rapport tous les jours à 10h00 :
 
 ```bash
-0 10 * * * /home/ubuntu/linxo_agent/run_daily_report.sh
+0 10 * * * /home/linxo/LINXO/run_daily_report.sh
 ```
 
 **Explication de la syntaxe cron :**
@@ -77,13 +77,13 @@ grep CRON /var/log/syslog | tail -20
 
 Les logs de chaque exécution seront sauvegardés dans :
 ```
-/home/ubuntu/linxo_agent/logs/daily_report_YYYYMMDD.log
+/home/linxo/LINXO/logs/daily_report_YYYYMMDD.log
 ```
 
 Pour consulter le dernier log :
 ```bash
-ls -lt /home/ubuntu/linxo_agent/logs/ | head -5
-tail -100 /home/ubuntu/linxo_agent/logs/daily_report_$(date +%Y%m%d).log
+ls -lt ~/LINXO/logs/ | head -5
+tail -100 ~/LINXO/logs/daily_report_$(date +%Y%m%d).log
 ```
 
 ## 🔧 Personnalisation
@@ -92,24 +92,17 @@ tail -100 /home/ubuntu/linxo_agent/logs/daily_report_$(date +%Y%m%d).log
 
 Pour exécuter à **8h30** au lieu de 10h :
 ```bash
-30 8 * * * /home/ubuntu/linxo_agent/run_daily_report.sh
+30 8 * * * /home/linxo/LINXO/run_daily_report.sh
 ```
 
 Pour exécuter **deux fois par jour** (10h et 18h) :
 ```bash
-0 10,18 * * * /home/ubuntu/linxo_agent/run_daily_report.sh
+0 10,18 * * * /home/linxo/LINXO/run_daily_report.sh
 ```
 
 Pour exécuter **du lundi au vendredi uniquement** à 10h :
 ```bash
-0 10 * * 1-5 /home/ubuntu/linxo_agent/run_daily_report.sh
-```
-
-### Utiliser un environnement virtuel
-
-Si vous utilisez un virtualenv Python, éditez `run_daily_report.sh` et décommentez cette ligne :
-```bash
-source /home/ubuntu/linxo_agent/venv/bin/activate
+0 10 * * 1-5 /home/linxo/LINXO/run_daily_report.sh
 ```
 
 ## ⚠️ Résolution de problèmes
@@ -128,7 +121,7 @@ grep CRON /var/log/syslog | tail -50
 
 3. Vérifiez les permissions du script :
 ```bash
-ls -l /home/ubuntu/linxo_agent/run_daily_report.sh
+ls -l ~/LINXO/run_daily_report.sh
 ```
 
 ### Les emails ne sont pas envoyés
@@ -148,7 +141,7 @@ EMAIL_TO=destinataire@email.com
 Pour tester rapidement, ajoutez temporairement une tâche qui s'exécute dans 2 minutes :
 ```bash
 # Si il est 14h35, mettez :
-37 14 * * * /home/ubuntu/linxo_agent/run_daily_report.sh
+37 14 * * * /home/linxo/LINXO/run_daily_report.sh
 ```
 
 Attendez 2 minutes et vérifiez les logs.
@@ -159,11 +152,11 @@ Pour surveiller les exécutions quotidiennes :
 
 ```bash
 # Voir les 10 derniers logs
-ls -lt /home/ubuntu/linxo_agent/logs/ | head -11
+ls -lt ~/LINXO/logs/ | head -11
 
 # Compter les succès/échecs
-grep "✅" /home/ubuntu/linxo_agent/logs/*.log | wc -l
-grep "❌" /home/ubuntu/linxo_agent/logs/*.log | wc -l
+grep "✅" ~/LINXO/logs/*.log | wc -l
+grep "❌" ~/LINXO/logs/*.log | wc -l
 ```
 
 ## 🔄 Désactivation temporaire
@@ -172,7 +165,7 @@ Pour désactiver temporairement le cron sans le supprimer, commentez la ligne :
 ```bash
 crontab -e
 # Ajoutez un # devant la ligne :
-# 0 10 * * * /home/ubuntu/linxo_agent/run_daily_report.sh
+# 0 10 * * * /home/linxo/LINXO/run_daily_report.sh
 ```
 
 ## 🗑️ Suppression complète
