@@ -397,15 +397,25 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
             print(f"[ERREUR] Champ password non trouve: {e}")
             return False
 
-        # Remplir les champs
+        # Remplir les champs avec des délais plus "humains"
         print("[ACTION] Remplissage des identifiants...")
         username_field.clear()
-        username_field.send_keys(email)
+        time.sleep(0.5)  # Petite pause après clear
+
+        # Taper l'email caractère par caractère (plus humain)
+        for char in email:
+            username_field.send_keys(char)
+            time.sleep(0.1)  # 100ms entre chaque caractère
         time.sleep(1)
 
         password_field.clear()
-        password_field.send_keys(password)
-        time.sleep(1)
+        time.sleep(0.5)
+
+        # Taper le mot de passe caractère par caractère
+        for char in password:
+            password_field.send_keys(char)
+            time.sleep(0.1)
+        time.sleep(2)  # Pause plus longue après remplissage
 
         # Chercher et cliquer sur le bouton "Je me connecte"
         submit_button = None
@@ -427,12 +437,36 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
                 return False
 
         print("[ACTION] Tentative de connexion...")
+
+        # Sauvegarder un screenshot avant le clic
+        try:
+            screenshot_path = "/tmp/before_login_click.png"
+            driver.save_screenshot(screenshot_path)
+            print(f"[DEBUG] Screenshot avant clic sauvegardé: {screenshot_path}")
+        except Exception as e:
+            print(f"[WARN] Screenshot impossible: {e}")
+
         submit_button.click()
 
-        # Attendre la redirection
-        time.sleep(8)
+        # Attendre la redirection (augmenter le délai)
+        time.sleep(5)
+
+        # Sauvegarder un screenshot après le clic
+        try:
+            screenshot_path = "/tmp/after_login_click.png"
+            driver.save_screenshot(screenshot_path)
+            print(f"[DEBUG] Screenshot après clic sauvegardé: {screenshot_path}")
+        except Exception as e:
+            print(f"[WARN] Screenshot impossible: {e}")
 
         print(f"[OK] URL apres connexion: {driver.current_url}")
+
+        # Debug: afficher un extrait de la page pour voir s'il y a un message d'erreur
+        page_text = driver.page_source[:1000].lower()
+        if 'erreur' in page_text or 'incorrect' in page_text or 'invalide' in page_text:
+            print("[DEBUG] Message d'erreur détecté dans la page!")
+            print("[DEBUG] Extrait de la page:")
+            print(driver.page_source[:500])
 
         # Vérifier si on est sur une page 2FA
         current_url_lower = driver.current_url.lower()
@@ -468,6 +502,17 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
             return _gerer_2fa(driver, wait)
 
         print("[ERREUR] Echec de la connexion (toujours sur la page de login)")
+
+        # Sauvegarder le HTML complet de la page pour diagnostic
+        try:
+            html_path = "/tmp/login_failed_page.html"
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            print(f"[DEBUG] HTML complet sauvegardé: {html_path}")
+            print("[DEBUG] Vérifiez ce fichier pour voir les messages d'erreur")
+        except Exception as save_error:
+            print(f"[WARN] Impossible de sauvegarder le HTML: {save_error}")
+
         return False
 
     except Exception as e:
@@ -529,9 +574,33 @@ def initialiser_driver_linxo(download_dir=None, headless=False, cleanup=True, ma
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--window-size=1920,1080')
+            options.add_argument(f'--user-data-dir={user_data_dir}')
+
+            # Options pour éviter la détection d'automatisation
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
+
+            # User-Agent réaliste (Chrome 120 sur Linux)
+            user_agent = (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            options.add_argument(f'user-agent={user_agent}')
+
+            # Options GPU améliorées pour headless
             options.add_argument('--disable-gpu')
             options.add_argument('--disable-software-rasterizer')
-            options.add_argument(f'--user-data-dir={user_data_dir}')
+            options.add_argument('--disable-dev-shm-usage')
+
+            # Options supplémentaires pour masquer l'automatisation
+            options.add_argument('--disable-blink-features=AutomationControlled')
+            options.add_argument('--disable-infobars')
+            options.add_argument('--disable-browser-side-navigation')
+            options.add_argument('--disable-features=VizDisplayCompositor')
+
+            # Langue et localisation
+            options.add_argument('--lang=fr-FR')
 
             # Port de debugging unique basé sur le PID pour éviter les conflits
             debug_port = 9222 + (os.getpid() % 1000)
@@ -548,12 +617,13 @@ def initialiser_driver_linxo(download_dir=None, headless=False, cleanup=True, ma
                 options.add_argument('--headless=new')
                 print("[INFO] Mode headless active (environnement serveur detecte)")
 
-            # Configuration des téléchargements
+            # Configuration complète des préférences (téléchargements + langue)
             prefs = {
                 "download.default_directory": str(download_dir.absolute()),
                 "download.prompt_for_download": False,
                 "download.directory_upgrade": True,
-                "safebrowsing.enabled": True
+                "safebrowsing.enabled": True,
+                "intl.accept_languages": "fr-FR,fr"
             }
             options.add_experimental_option("prefs", prefs)
 
@@ -563,8 +633,28 @@ def initialiser_driver_linxo(download_dir=None, headless=False, cleanup=True, ma
 
             # Tentative de création du driver
             driver = webdriver.Chrome(options=options)
+
+            # Masquer les propriétés webdriver avec JavaScript
+            driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': '''
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5]
+                    });
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['fr-FR', 'fr', 'en-US', 'en']
+                    });
+                    window.chrome = {
+                        runtime: {}
+                    };
+                '''
+            })
+
             wait = WebDriverWait(driver, 30)
             print("[OK] Navigateur initialise avec succes!")
+            print("[OK] Masquage des proprietes webdriver applique")
 
             # Retourner le driver, wait ET le user_data_dir pour cleanup ultérieur
             return driver, wait, user_data_dir
