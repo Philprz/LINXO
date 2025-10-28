@@ -95,19 +95,19 @@ class Config:
                 with open(self.depenses_file, 'r', encoding='utf-8') as f:
                     self.depenses_data = json.load(f)
 
-                # Mettre à jour le budget depuis le JSON si différent
-                budget_json = self.depenses_data.get('totaux', {}).get('budget_variable_max', self.budget_variable)
-
-                # Utiliser le budget du .env comme référence
+                # Utiliser le budget du .env comme référence (écrase le JSON)
                 self.depenses_data['totaux']['budget_variable_max'] = self.budget_variable
 
-                print(f"[OK] Depenses recurrentes chargees: {len(self.depenses_data.get('depenses_fixes', []))} depenses fixes")
-            except Exception as e:
+                depenses_count = len(self.depenses_data.get('depenses_fixes', []))
+                print(f"[OK] Depenses recurrentes chargees: {depenses_count} depenses fixes")
+            except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
                 print(f"[WARN] Erreur lors du chargement des depenses: {e}")
-                self.depenses_data = {'depenses_fixes': [], 'totaux': {'budget_variable_max': self.budget_variable}}
+                self.depenses_data = {'depenses_fixes': [],
+                                      'totaux': {'budget_variable_max': self.budget_variable}}
         else:
             print(f"[WARN] Fichier depenses_recurrentes.json non trouve: {self.depenses_file}")
-            self.depenses_data = {'depenses_fixes': [], 'totaux': {'budget_variable_max': self.budget_variable}}
+            self.depenses_data = {'depenses_fixes': [],
+                                  'totaux': {'budget_variable_max': self.budget_variable}}
 
     def _load_api_secrets(self):
         """Charge les secrets API depuis .env ou api_secrets.json"""
@@ -115,8 +115,14 @@ class Config:
         # Priorité 1: Depuis .env
         self.smtp_email = os.getenv('SENDER_EMAIL', '')
         self.smtp_password = os.getenv('SENDER_PASSWORD', '')
-        self.smtp_server = 'smtp.gmail.com'
-        self.smtp_port = 587
+        self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
+
+        # Configuration IMAP (utilise les mêmes credentials que SMTP par défaut)
+        self.imap_email = os.getenv('IMAP_EMAIL', self.smtp_email)
+        self.imap_password = os.getenv('IMAP_PASSWORD', self.smtp_password)
+        self.imap_server = os.getenv('IMAP_SERVER', 'imap.gmail.com')
+        self.imap_port = int(os.getenv('IMAP_PORT', '993'))
 
         self.notification_emails = [
             email.strip()
@@ -154,12 +160,13 @@ class Config:
                     ovh_secrets = secrets['OVH_SMS'].get('secrets', {})
                     self.ovh_compte_sms = ovh_secrets.get('COMPTE_SMS', self.ovh_service_name)
                     self.ovh_utilisateur_sms = ovh_secrets.get('UTILISATEUR_SMS', 'default')
-                    self.ovh_mot_de_passe_sms = ovh_secrets.get('MOT_DE_PASSE_SMS', self.ovh_app_secret)
+                    self.ovh_mot_de_passe_sms = ovh_secrets.get('MOT_DE_PASSE_SMS',
+                                                                self.ovh_app_secret)
                     self.ovh_expediteur_sms = ovh_secrets.get('EXPEDITEUR_SMS', self.sms_sender)
                     self.ovh_email = ovh_secrets.get('OVH_EMAIL', self.ovh_email_envoi)
 
                 print(f"[OK] Secrets API charges depuis: {self.api_secrets_file}")
-            except Exception as e:
+            except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
                 print(f"[WARN] Erreur lors du chargement des secrets: {e}")
         else:
             # Créer la structure OVH à partir du .env
@@ -169,11 +176,14 @@ class Config:
             self.ovh_expediteur_sms = self.sms_sender
             self.ovh_email = self.ovh_email_envoi
 
-            print(f"[WARN] Fichier api_secrets.json non trouve, utilisation du .env")
+            print("[WARN] Fichier api_secrets.json non trouve, utilisation du .env")
 
         # Validation
         if not self.smtp_email or not self.smtp_password:
             print("[WARN] ATTENTION: Credentials SMTP manquants")
+
+        if not self.imap_email or not self.imap_password:
+            print("[WARN] ATTENTION: Credentials IMAP manquants (necessaires pour 2FA)")
 
         if not self.sms_recipients:
             print("[WARN] ATTENTION: Aucun destinataire SMS configure")
@@ -207,21 +217,23 @@ class Config:
         print(f"Linxo email:            {self.linxo_email}")
         print("=" * 80 + "\n")
 
-# Instance globale de configuration
-_config = None
+# Instance globale de configuration (singleton)
+_CONFIG_INSTANCE = None  # pylint: disable=invalid-name
+
 
 def get_config():
     """Retourne l'instance de configuration (singleton)"""
-    global _config
-    if _config is None:
-        _config = Config()
-    return _config
+    global _CONFIG_INSTANCE  # pylint: disable=global-statement
+    if _CONFIG_INSTANCE is None:
+        _CONFIG_INSTANCE = Config()
+    return _CONFIG_INSTANCE
+
 
 def reload_config():
     """Recharge la configuration"""
-    global _config
-    _config = Config()
-    return _config
+    global _CONFIG_INSTANCE  # pylint: disable=global-statement
+    _CONFIG_INSTANCE = Config()
+    return _CONFIG_INSTANCE
 
 # Export pour faciliter l'usage
 __all__ = ['Config', 'get_config', 'reload_config']

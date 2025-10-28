@@ -41,20 +41,19 @@ def recuperer_code_2fa_email(timeout: int = 120, check_interval: int = 5) -> str
     """
     print("\n[2FA] Recherche du code 2FA dans l'email...")
 
-    # Charger la config (.env)
-    _ = get_config()
+    # Charger la config unifiée
+    config = get_config()
 
-    # Paramètres IMAP
-    imap_email = os.getenv("IMAP_EMAIL")
-    imap_password = os.getenv("IMAP_PASSWORD")
-    imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
-    try:
-        imap_port = int(os.getenv("IMAP_PORT", "993"))
-    except ValueError:
-        imap_port = 993
+    # Paramètres IMAP depuis la config
+    imap_email = config.imap_email
+    imap_password = config.imap_password
+    imap_server = config.imap_server
+    imap_port = config.imap_port
 
     if not imap_email or not imap_password:
-        print("[ERREUR] IMAP_EMAIL/IMAP_PASSWORD manquants dans .env.")
+        print("[ERREUR] Credentials IMAP manquants dans la configuration.")
+        print("[INFO] Configurez SENDER_EMAIL et SENDER_PASSWORD dans .env")
+        print("[INFO] Ou definissez IMAP_EMAIL et IMAP_PASSWORD pour un compte different")
         return None
 
     start_time = time.time()
@@ -227,22 +226,23 @@ def tester_connexion_imap() -> bool:
         bool: True si la connexion et la lecture sont possibles, False sinon.
     """
     print("\n[TEST] Test de la connexion IMAP...")
-    cfg = get_config()
-    print(f"La config est chargée: {cfg}")
+    config = get_config()
 
-    imap_email = os.getenv("IMAP_EMAIL")
-    imap_password = os.getenv("IMAP_PASSWORD")
-    imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
-    try:
-        imap_port = int(os.getenv("IMAP_PORT", "993"))
-    except ValueError:
-        imap_port = 993
+    # Paramètres IMAP depuis la config unifiée
+    imap_email = config.imap_email
+    imap_password = config.imap_password
+    imap_server = config.imap_server
+    imap_port = config.imap_port
+
+    print(f"[INFO] Email IMAP: {imap_email}")
+    print(f"[INFO] Serveur IMAP: {imap_server}:{imap_port}")
 
     if not imap_email or not imap_password:
-        print("[ERREUR] IMAP_EMAIL/IMAP_PASSWORD manquants dans .env.")
+        print("[ERREUR] Credentials IMAP manquants dans la configuration.")
+        print("[INFO] Configurez SENDER_EMAIL et SENDER_PASSWORD dans .env")
+        print("[INFO] Ou definissez IMAP_EMAIL et IMAP_PASSWORD pour un compte different")
         return False
 
-    # (enlève les parenthèses inutiles après `not`)
     if not 0 < imap_port <= 65535:
         print("[ERREUR] Port IMAP invalide (1..65535).")
         return False
