@@ -33,6 +33,8 @@ wheels/
 
 # Selenium & Chrome
 chrome_linxo_profile/
+.chrome_user_data/
+.chrome_user_data_test/
 *.crx
 chromedriver*
 geckodriver*

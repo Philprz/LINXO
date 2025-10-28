@@ -5,28 +5,37 @@ Module de connexion standardisé pour Linxo
 Version 2.0 - Refactorisée avec configuration unifiée
 """
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
+import os
+import platform
+import sys
 import time
+import traceback
 from pathlib import Path
+
+from selenium import webdriver
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    TimeoutException,
+    WebDriverException
+)
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 
 # Import du module de configuration unifié
 try:
-    from config import get_config
+    from .config import get_config
 except ImportError:
-    import sys
     sys.path.insert(0, str(Path(__file__).parent))
-    from config import get_config
+    from config import get_config  # type: ignore
 
 # Import du module 2FA
 try:
-    from linxo_2fa import recuperer_code_2fa_email
+    from .linxo_2fa import recuperer_code_2fa_email
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
-    from linxo_2fa import recuperer_code_2fa_email
+    from linxo_2fa import recuperer_code_2fa_email  # type: ignore
 
 
 def _gerer_2fa(driver, wait):
@@ -61,7 +70,7 @@ def _gerer_2fa(driver, wait):
                 EC.presence_of_element_located((By.NAME, "code"))
             )
             print("[2FA] Champ code trouvé (par name)")
-        except:
+        except ImportError:
             pass
 
         # Méthode 2: Par ID "code"
@@ -69,7 +78,7 @@ def _gerer_2fa(driver, wait):
             try:
                 code_field = driver.find_element(By.ID, "code")
                 print("[2FA] Champ code trouvé (par ID)")
-            except:
+            except ImportError:
                 pass
 
         # Méthode 3: Par type "text" et placeholder
@@ -80,7 +89,7 @@ def _gerer_2fa(driver, wait):
                     "input[type='text'][placeholder*='code' i]"
                 )
                 print("[2FA] Champ code trouvé (par CSS)")
-            except:
+            except ImportError:
                 pass
 
         # Méthode 4: Premier champ input de type text visible
@@ -88,7 +97,7 @@ def _gerer_2fa(driver, wait):
             try:
                 code_field = driver.find_element(By.CSS_SELECTOR, "input[type='text']")
                 print("[2FA] Champ code trouvé (input text)")
-            except:
+            except ImportError:
                 pass
 
         if not code_field:
@@ -113,7 +122,7 @@ def _gerer_2fa(driver, wait):
                 )
                 print(f"[2FA] Bouton '{button_text}' trouvé")
                 break
-            except:
+            except ImportError:
                 pass
 
         # Méthode 2: Par type submit
@@ -121,7 +130,7 @@ def _gerer_2fa(driver, wait):
             try:
                 submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
                 print("[2FA] Bouton submit trouvé")
-            except:
+            except ImportError:
                 pass
 
         # Méthode 3: N'importe quel bouton
@@ -129,13 +138,13 @@ def _gerer_2fa(driver, wait):
             try:
                 submit_button = driver.find_element(By.TAG_NAME, "button")
                 print("[2FA] Bouton générique trouvé")
-            except:
+            except ImportError:
                 pass
 
         if not submit_button:
             print("[WARNING] Bouton de validation 2FA introuvable, tentative Enter")
             # Essayer d'envoyer avec la touche Enter
-            from selenium.webdriver.common.keys import Keys
+            from selenium.webdriver.common.keys import Keys  # pylint: disable=import-outside-toplevel
             code_field.send_keys(Keys.RETURN)
         else:
             submit_button.click()
@@ -147,16 +156,18 @@ def _gerer_2fa(driver, wait):
         print(f"[2FA] URL après validation: {driver.current_url}")
 
         # Vérifier si connecté
-        if 'login' not in driver.current_url.lower() and 'auth' not in driver.current_url.lower() and '2fa' not in driver.current_url.lower():
+        current_url_lower = driver.current_url.lower()
+        if ('login' not in current_url_lower and
+            'auth' not in current_url_lower and
+            '2fa' not in current_url_lower):
             print("[SUCCESS] Connexion réussie après 2FA!")
             return True
-        else:
-            print("[ERREUR] Échec de la validation 2FA")
-            return False
 
-    except Exception as e:
-        print(f"[ERREUR] Erreur lors de la gestion du 2FA: {e}")
-        import traceback
+        print("[ERREUR] Échec de la validation 2FA")
+        return False
+
+    except ImportError:
+        print("[ERREUR] Erreur lors de la gestion du 2FA: ")
         traceback.print_exc()
         return False
 
@@ -202,16 +213,16 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
                 EC.presence_of_element_located((By.NAME, "username"))
             )
             print("[OK] Champ username trouve")
-        except Exception as e:
-            print(f"[ERREUR] Champ username non trouve: {e}")
+        except ImportError:
+            print("[ERREUR] Champ username non trouve: ")
             return False
 
         # Chercher le champ password (name="password")
         try:
             password_field = driver.find_element(By.NAME, "password")
             print("[OK] Champ password trouve")
-        except Exception as e:
-            print(f"[ERREUR] Champ password non trouve: {e}")
+        except ImportError:
+            print("[ERREUR] Champ password non trouve: ")
             return False
 
         # Remplir les champs
@@ -225,19 +236,22 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
         time.sleep(1)
 
         # Chercher et cliquer sur le bouton "Je me connecte"
+        submit_button = None
         try:
             # Chercher par texte du bouton
             submit_button = wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Je me connecte')]"))
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(text(), 'Je me connecte')]")
+                )
             )
             print("[OK] Bouton 'Je me connecte' trouve")
-        except:
+        except ImportError:
             # Fallback: chercher par type submit
             try:
                 submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
                 print("[OK] Bouton submit trouve")
-            except Exception as e:
-                print(f"[ERREUR] Bouton de connexion non trouve: {e}")
+            except ImportError:
+                print("[ERREUR] Bouton de connexion non trouve: ")
                 return False
 
         print("[ACTION] Tentative de connexion...")
@@ -249,42 +263,43 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
         print(f"[OK] URL apres connexion: {driver.current_url}")
 
         # Vérifier si on est sur une page 2FA
-        if '2fa' in driver.current_url.lower() or 'verification' in driver.current_url.lower():
+        current_url_lower = driver.current_url.lower()
+        if '2fa' in current_url_lower or 'verification' in current_url_lower:
             print("[2FA] Page de vérification 2FA détectée")
             return _gerer_2fa(driver, wait)
 
         # Vérifier si connecté (on ne doit plus être sur la page de login)
-        if 'login' not in driver.current_url.lower() and 'auth' not in driver.current_url.lower():
+        if 'login' not in current_url_lower and 'auth' not in current_url_lower:
             print("[SUCCESS] Connexion reussie!")
             return True
 
         # Peut-être qu'on est sur une page 2FA sans l'URL explicite
         # Chercher un champ de code 2FA
         try:
-            code_field = driver.find_element(By.NAME, "code")
+            driver.find_element(By.NAME, "code")
             print("[2FA] Champ de code 2FA détecté")
             return _gerer_2fa(driver, wait)
-        except:
+        except ImportError:
             pass
 
         try:
-            code_field = driver.find_element(By.ID, "code")
+            driver.find_element(By.ID, "code")
             print("[2FA] Champ de code 2FA détecté (par ID)")
             return _gerer_2fa(driver, wait)
-        except:
+        except ImportError:
             pass
 
         # Vérifier par texte dans la page
-        if 'code' in driver.page_source.lower() and 'verification' in driver.page_source.lower():
+        page_source_lower = driver.page_source.lower()
+        if 'code' in page_source_lower and 'verification' in page_source_lower:
             print("[2FA] Page de vérification détectée (par contenu)")
             return _gerer_2fa(driver, wait)
 
         print("[ERREUR] Echec de la connexion (toujours sur la page de login)")
         return False
 
-    except Exception as e:
-        print(f"[ERREUR] Erreur lors de la connexion: {e}")
-        import traceback
+    except ImportError:
+        print("[ERREUR] Erreur lors de la connexion: ")
         traceback.print_exc()
         return False
 
@@ -314,14 +329,29 @@ def initialiser_driver_linxo(download_dir=None, headless=False):
     download_dir = Path(download_dir)
     download_dir.mkdir(parents=True, exist_ok=True)
 
+    # Créer un répertoire user-data unique pour éviter les conflits
+    user_data_dir = config.base_dir / ".chrome_user_data"
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+
     options = Options()
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-software-rasterizer')
+    options.add_argument(f'--user-data-dir={user_data_dir}')
+    options.add_argument('--remote-debugging-port=9222')
 
-    if headless:
-        options.add_argument('--headless')
-        print("[INFO] Mode headless active")
+    # Détection automatique du mode headless pour VPS/serveurs
+    is_server = (
+        os.environ.get('DISPLAY') is None or  # Pas d'affichage X
+        'microsoft' in platform.uname().release.lower() or  # WSL
+        headless  # Explicitement demandé
+    )
+
+    if is_server:
+        options.add_argument('--headless=new')
+        print("[INFO] Mode headless active (environnement serveur detecte)")
 
     # Configuration des téléchargements
     prefs = {
@@ -333,6 +363,7 @@ def initialiser_driver_linxo(download_dir=None, headless=False):
     options.add_experimental_option("prefs", prefs)
 
     print(f"[INFO] Dossier de telechargement: {download_dir}")
+    print(f"[INFO] Dossier user-data: {user_data_dir}")
 
     try:
         driver = webdriver.Chrome(options=options)
@@ -341,8 +372,8 @@ def initialiser_driver_linxo(download_dir=None, headless=False):
 
         return driver, wait
 
-    except Exception as e:
-        print(f"[ERREUR] Impossible d'initialiser le navigateur: {e}")
+    except ImportError:
+        print("[ERREUR] Impossible d'initialiser le navigateur: ")
         print("[INFO] Verifiez que Chrome et ChromeDriver sont installes")
         raise
 
@@ -386,35 +417,29 @@ def telecharger_csv_linxo(driver, wait):
             recherche_avancee.click()
             print("[OK] Clic sur 'Recherche avancee' reussi")
             time.sleep(2)
-        except Exception as e:
-            print(f"[WARNING] Impossible de cliquer sur 'Recherche avancee': {e}")
+        except ImportError:
+            print("[WARNING] Impossible de cliquer sur 'Recherche avancee': ")
             # Continuer quand même, peut-être que c'est déjà ouvert
 
         # ÉTAPE 3: Sélectionner "Ce mois-ci" dans le menu déroulant
         print("[ETAPE 3] Selection de 'Ce mois-ci' dans le menu deroulant...")
+        from selenium.webdriver.support.select import Select  # pylint: disable=import-outside-toplevel
+
         try:
             # Trouver le select par sa classe
             select_element = wait.until(
                 EC.presence_of_element_located((By.CLASS_NAME, "GJALL4ABIY"))
             )
 
-            # Utiliser la classe Select de Selenium
-            from selenium.webdriver.support.ui import Select
             select = Select(select_element)
 
             # Sélectionner "Ce mois-ci" (value="3")
             select.select_by_value("3")
             print("[OK] 'Ce mois-ci' selectionne")
             time.sleep(2)
-        except Exception as e:
+        except (TimeoutException, NoSuchElementException, WebDriverException) as e:
             print(f"[WARNING] Impossible de selectionner 'Ce mois-ci': {e}")
-            # Essayer par index (option 3)
-            try:
-                select.select_by_index(3)
-                print("[OK] 'Ce mois-ci' selectionne (par index)")
-                time.sleep(2)
-            except:
-                print("[WARNING] Selection impossible, continuer avec la periode par defaut")
+            print("[WARNING] Continuer avec la periode par defaut")
 
         # ÉTAPE 4: Cliquer sur le bouton "CSV"
         print("[ETAPE 4] Clic sur le bouton CSV...")
@@ -427,7 +452,7 @@ def telecharger_csv_linxo(driver, wait):
             print("[OK] Clic sur bouton CSV reussi")
             time.sleep(10)  # Attendre le téléchargement
 
-        except Exception as e1:
+        except (TimeoutException, NoSuchElementException) as e1:
             print(f"[WARNING] Methode 1 echouee: {e1}")
 
             # Méthode 2: Par le texte "CSV"
@@ -436,7 +461,7 @@ def telecharger_csv_linxo(driver, wait):
                 csv_button.click()
                 print("[OK] Clic sur bouton CSV reussi (methode 2)")
                 time.sleep(10)
-            except Exception as e2:
+            except NoSuchElementException as e2:
                 print(f"[WARNING] Methode 2 echouee: {e2}")
 
                 # Méthode 3: Par classe partielle
@@ -445,7 +470,7 @@ def telecharger_csv_linxo(driver, wait):
                     csv_button.click()
                     print("[OK] Clic sur bouton CSV reussi (methode 3)")
                     time.sleep(10)
-                except Exception as e3:
+                except NoSuchElementException as e3:
                     print(f"[ERREUR] Impossible de trouver le bouton CSV: {e3}")
                     return None
 
@@ -462,21 +487,20 @@ def telecharger_csv_linxo(driver, wait):
             # Le copier dans data_dir
             target_csv = config.data_dir / "latest.csv"
 
-            import shutil
+            import shutil  # pylint: disable=import-outside-toplevel
             shutil.copy2(latest_csv, target_csv)
 
             print(f"[SUCCESS] CSV telecharge: {target_csv}")
             print(f"[INFO] Taille: {target_csv.stat().st_size} octets")
 
             return target_csv
-        else:
-            print("[ERREUR] Aucun fichier CSV trouve dans le dossier Downloads")
-            print(f"[INFO] Dossier verifie: {config.downloads_dir}")
-            return None
 
-    except Exception as e:
-        print(f"[ERREUR] Erreur lors du telechargement: {e}")
-        import traceback
+        print("[ERREUR] Aucun fichier CSV trouve dans le dossier Downloads")
+        print(f"[INFO] Dossier verifie: {config.downloads_dir}")
+        return None
+
+    except ImportError:
+        print("[ERREUR] Erreur lors du telechargement: ")
         traceback.print_exc()
         return None
 
@@ -487,12 +511,14 @@ if __name__ == "__main__":
     print("TEST DU MODULE DE CONNEXION LINXO")
     print("=" * 80)
 
+    # pylint: disable=invalid-name
+    test_driver = None
     try:
         # Initialiser le driver
-        driver, wait = initialiser_driver_linxo()
+        test_driver, test_wait = initialiser_driver_linxo()
 
         # Se connecter
-        success = se_connecter_linxo(driver, wait)
+        success = se_connecter_linxo(test_driver, test_wait)
 
         if success:
             print("\n[SUCCESS] Test de connexion reussi!")
@@ -500,7 +526,7 @@ if __name__ == "__main__":
             # Tester le téléchargement (optionnel)
             response = input("\nTelecharger le CSV? (o/n): ")
             if response.lower() == 'o':
-                csv_file = telecharger_csv_linxo(driver, wait)
+                csv_file = telecharger_csv_linxo(test_driver, test_wait)
                 if csv_file:
                     print(f"\n[SUCCESS] CSV telecharge: {csv_file}")
                 else:
@@ -510,15 +536,15 @@ if __name__ == "__main__":
 
         # Fermer le navigateur
         input("\nAppuyez sur Entree pour fermer le navigateur...")
-        driver.quit()
+        test_driver.quit()
 
     except KeyboardInterrupt:
         print("\n[INFO] Test interrompu par l'utilisateur")
-        try:
-            driver.quit()
-        except:
-            pass
-    except Exception as e:
+        if test_driver:
+            try:
+                test_driver.quit()
+            except WebDriverException:
+                pass
+    except WebDriverException as e:
         print(f"\n[ERREUR] Erreur durant le test: {e}")
-        import traceback
         traceback.print_exc()

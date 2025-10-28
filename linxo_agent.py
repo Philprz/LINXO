@@ -239,7 +239,7 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 driver.quit()
             except (AttributeError, OSError, RuntimeError, WebDriverException) as quit_error:
                 print(f"[WARNING] Impossible de fermer le navigateur proprement: {quit_error}")
-            except ImportError
+            except ImportError:
                 print("[WARNING] Erreur inattendue lors de la fermeture")
         return results
 
@@ -252,17 +252,17 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
             except (AttributeError, OSError, RuntimeError, WebDriverException) as quit_error:
                 print(f"[WARNING] Impossible de fermer le navigateur proprement: {quit_error}")
             except ImportError:
-                print(f"[WARNING] Erreur inattendue lors de la fermeture: {quit_error}")
+                print("[WARNING] Erreur inattendue lors de la fermeture")
         return results
 
     except ImportError:
-        print(f"\n[ERREUR FATALE] Erreur non gérée: {error}")
+        print("\n[ERREUR FATALE] Erreur non gérée")
         traceback.print_exc()
         if driver:
             try:
                 driver.quit()
             except ImportError:
-                print(f"[WARNING] Erreur lors de la fermeture: {quit_error}")
+                print("[WARNING] Erreur lors de la fermeture")
         return results
 
 
