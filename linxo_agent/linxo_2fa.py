@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import datetime as dt
 import email
+import email.header
 import imaplib
-import os
 import re
 import socket
 import ssl
@@ -61,7 +61,10 @@ def recuperer_code_2fa_email(timeout: int = 120, check_interval: int = 5) -> str
 
     # Motifs pour extraire un code 2FA (6 chiffres)
     patterns = [
-        r"(?:code|CODE)\s*(?:est|:)?\s*(\d{6})",
+        # Format avec espaces : "3 2 7 8 9 6"
+        r"(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)\s+(\d)",
+        # Format classique : "327896"
+        r"(?:code|CODE)\s*(?:est)?\s*:?\s*(\d{6})",
         r"(?:vérification|verification)\s*:?\s*(\d{6})",
         r"(?:authentification|authentication)\s*:?\s*(\d{6})",
         r"\b(\d{6})\b",
@@ -89,12 +92,12 @@ def recuperer_code_2fa_email(timeout: int = 120, check_interval: int = 5) -> str
                 time.sleep(check_interval)
                 continue
 
-            # Recherche des emails plausibles
-            search_criteria = '(OR FROM "linxo" OR FROM "noreply" SUBJECT "code")'
-            status, messages = mail.search(None, search_criteria)
+            # Recherche des emails plausibles (assistance@linxo.com)
+            # Note: recherche simple FROM "linxo" fonctionne mieux avec IMAP
+            status, messages = mail.search(None, 'FROM', '"linxo"')
 
             if status != "OK" or not messages or not messages[0]:
-                print("[INFO] Aucun email trouvé pour l’instant…")
+                print(f"[DEBUG] Aucun email trouvé - status={status}")
                 mail.close()
                 mail.logout()
                 time.sleep(check_interval)
@@ -102,63 +105,91 @@ def recuperer_code_2fa_email(timeout: int = 120, check_interval: int = 5) -> str
 
             email_ids = messages[0].split()
             if not email_ids:
-                print("[INFO] Aucun email trouvé pour l’instant…")
+                print("[DEBUG] Liste d'emails vide")
                 mail.close()
                 mail.logout()
                 time.sleep(check_interval)
                 continue
 
+            print(f"[DEBUG] {len(email_ids)} emails Linxo trouvés, analyse des 10 plus récents...")
             # Parcours des 10 plus récents (du plus récent au plus ancien)
+            analyzed_count = 0
             for email_id in reversed(email_ids[-10:]):
+                analyzed_count += 1
                 fetch_status, msg_data = mail.fetch(email_id, "(RFC822)")
                 if fetch_status != "OK" or not msg_data:
+                    print(f"[DEBUG] Email {analyzed_count}: fetch échoué")
                     continue
 
                 # ----- Extraction sûre du payload email -----
+                # Prendre le plus gros élément bytes (évite de prendre le header IMAP)
                 raw_email_bytes = None
 
                 for item in msg_data:
-                    payload_candidate = None
-
                     if isinstance(item, tuple):
-                        # Cast explicite pour rassurer l'analyseur statique
                         for el in tuple(item):
                             if isinstance(el, (bytes, bytearray)):
-                                payload_candidate = el
-                                break
-
+                                if raw_email_bytes is None or len(el) > len(raw_email_bytes):
+                                    raw_email_bytes = el
                     elif isinstance(item, (bytes, bytearray)):
-                        # Certains serveurs renvoient directement le corps ici
-                        payload_candidate = item
-
-                    if payload_candidate:
-                        raw_email_bytes = payload_candidate
-                        break
+                        if raw_email_bytes is None or len(item) > len(raw_email_bytes):
+                            raw_email_bytes = item
 
                 if not raw_email_bytes:
+                    print(f"[DEBUG] Email {analyzed_count}: payload vide")
                     continue
                 # ----- fin extraction sûre -----
 
                 # Parser l'email
                 try:
                     email_message = email.message_from_bytes(raw_email_bytes)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError) as e:
+                    print(f"[DEBUG] Email {analyzed_count}: parsing échoué - {e}")
                     continue
 
                 # Date du mail et filtrage (< 5 min)
                 date_hdr = email_message.get("Date")
                 email_date = parsedate_to_datetime(date_hdr) if date_hdr else None
                 if email_date is None:
+                    print(f"[DEBUG] Email {analyzed_count}: pas de date")
                     continue
                 if email_date.tzinfo is None:
                     email_date = email_date.replace(tzinfo=dt.timezone.utc)
                 now = dt.datetime.now(tz=email_date.tzinfo)
-                if (now - email_date).total_seconds() > 300:
+                age_seconds = (now - email_date).total_seconds()
+                age_minutes = int(age_seconds / 60)
+                if age_seconds > 300:
+                    print(f"[DEBUG] Email {analyzed_count}: trop ancien ({age_minutes} min)")
                     continue
+
+                print(f"[DEBUG] Email {analyzed_count}: récent ({age_minutes} min), analyse en cours...")
 
                 subject = email_message.get("Subject", "")
                 from_addr = email_message.get("From", "")
                 print(f"[2FA] Email trouvé: De={from_addr}, Sujet={subject}")
+
+                # Vérifier d'abord dans le sujet (Linxo met le code dans le sujet)
+                # Décoder le sujet s'il est encodé
+                decoded_subject = ""
+                if subject:
+                    decoded_parts = email.header.decode_header(subject)
+                    for part, encoding in decoded_parts:
+                        if isinstance(part, bytes):
+                            decoded_subject += part.decode(encoding or "utf-8", errors="ignore")
+                        else:
+                            decoded_subject += part
+
+                # Chercher un code à 6 chiffres dans le sujet
+                subject_match = re.search(r"\b(\d{6})\b", decoded_subject)
+                if subject_match:
+                    code_2fa = subject_match.group(1)
+                    print(f"[SUCCESS] Code 2FA trouvé dans le sujet: {code_2fa}")
+                    try:
+                        mail.close()
+                    except imaplib.IMAP4.error:
+                        pass
+                    mail.logout()
+                    return code_2fa
 
                 # Corps du message
                 body_parts: list[str] = []
@@ -188,7 +219,11 @@ def recuperer_code_2fa_email(timeout: int = 120, check_interval: int = 5) -> str
                 for pattern in patterns:
                     m = re.search(pattern, body, flags=re.IGNORECASE)
                     if m:
-                        code_2fa = m.group(1)
+                        # Si plusieurs groupes (format avec espaces), les concaténer
+                        if len(m.groups()) > 1:
+                            code_2fa = "".join(m.groups())
+                        else:
+                            code_2fa = m.group(1)
                         print(f"[SUCCESS] Code 2FA trouvé: {code_2fa}")
                         try:
                             mail.close()
