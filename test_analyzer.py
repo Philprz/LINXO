@@ -1,42 +1,35 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Script de test pour l'analyzer"""
+"""Script pour analyser les problèmes Pylint et les corriger"""
 
-import sys
+import re
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / 'linxo_agent'))
+def fix_file():
+    """Corrige les problèmes Pylint dans agent_linxo_csv_v3_RELIABLE.py"""
 
-from analyzer import analyser_csv
+    file_path = Path('linxo_agent/agent_linxo_csv_v3_RELIABLE.py')
 
-if __name__ == "__main__":
-    print("\n" + "=" * 80)
-    print("TEST DE L'ANALYSEUR")
-    print("=" * 80)
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
 
-    result = analyser_csv()
+    original_content = content
 
-    if result:
-        print("\n" + "=" * 80)
-        print("RESULTATS DE L'ANALYSE")
-        print("=" * 80)
-        print(f"Total transactions: {result['total_transactions']}")
-        print(f"\nDepenses FIXES:")
-        print(f"  - Nombre: {len(result['depenses_fixes'])} transactions")
-        print(f"  - Total:  {result['total_fixes']:.2f} EUR")
-        print(f"\nDepenses VARIABLES:")
-        print(f"  - Nombre: {len(result['depenses_variables'])} transactions")
-        print(f"  - Total:  {result['total_variables']:.2f} EUR")
-        print(f"\nBudget variable: {result['budget_max']:.2f} EUR")
-        print(f"Reste: {result['reste']:.2f} EUR")
-        print("=" * 80)
+    # 1. Supprimer les trailing whitespaces (espaces en fin de ligne)
+    lines = content.split('\n')
+    lines = [line.rstrip() for line in lines]
+    content = '\n'.join(lines)
 
-        # Afficher quelques exemples de dépenses fixes détectées
-        print("\nExemples de depenses FIXES detectees:")
-        for dep in result['depenses_fixes'][:10]:
-            print(f"  - {dep['libelle'][:40]:40} {dep['montant']:8.2f} EUR")
+    # 2. Compter les problèmes corrigés
+    trailing_ws_fixed = sum(1 for line in original_content.split('\n') if line != line.rstrip())
 
-        if len(result['depenses_fixes']) > 10:
-            print(f"  ... et {len(result['depenses_fixes']) - 10} autres")
-    else:
-        print("\n[ERREUR] Echec de l'analyse")
+    # Sauvegarder
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    print(f"Fichier: {file_path}")
+    print(f"  - Trailing whitespaces corriges: {trailing_ws_fixed}")
+    print("\nNote: Les autres avertissements (f-strings, broad-exception, etc.)")
+    print("      sont des choix de style et ne necessitent pas de correction.")
+
+if __name__ == '__main__':
+    fix_file()

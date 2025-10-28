@@ -245,7 +245,7 @@
       "compte": "Boursobank",
       "identifiant": "Cath",
       "commentaire": "AssuranceVie Gestion Rotschild",
-      "montant": 200.0,
+      "montant": 100.0,
       "categorie": "Epargne"
     },
     {
@@ -253,7 +253,7 @@
       "compte": "Boursobank",
       "identifiant": "Phil",
       "commentaire": "AssuranceVie Gestion Rotschild",
-      "montant": 400.0,
+      "montant": 200.0,
       "categorie": "Epargne"
     }
   ],
@@ -293,7 +293,7 @@
     "transport": 197.8,
     "impots": 0.0,
     "epargne": 600.0,
-    "total_depenses_fixes": 3343,
+    "total_depenses_fixes": 3000,
     "total_revenus": 4745.87,
     "budget_variable_max": 1400
   }
