@@ -11,11 +11,15 @@ Ce script orchestre l'ensemble du processus:
 4. Envoi des notifications (email + SMS)
 """
 
-import sys
 import argparse
+import sys
 import traceback
-from pathlib import Path
+from csv import Error as CsvError
 from datetime import datetime
+from pathlib import Path
+from smtplib import SMTPException
+from contextlib import suppress
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 # Imports des modules refactorisés
 from linxo_agent.config import get_config
@@ -27,6 +31,32 @@ from linxo_agent.linxo_connexion import (
 from linxo_agent.analyzer import analyser_csv
 from linxo_agent.notifications import NotificationManager
 
+DOWNLOAD_ERRORS = (
+    OSError,
+    ConnectionError,
+    TimeoutError,
+    TimeoutException,
+    WebDriverException,
+    RuntimeError,
+)
+
+ANALYSIS_ERRORS = (
+    OSError,
+    ValueError,
+    CsvError,
+    RuntimeError,
+)
+
+NOTIFICATION_ERRORS = (
+    SMTPException,
+    ConnectionError,
+    OSError,
+    RuntimeError,
+    ValueError,
+)
+
+GENERAL_WORKFLOW_ERRORS = DOWNLOAD_ERRORS + ANALYSIS_ERRORS + NOTIFICATION_ERRORS
+QUIT_ERRORS = (AttributeError, OSError, RuntimeError, WebDriverException)
 
 def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=None):
     """
@@ -90,26 +120,27 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                     print("[ERREUR] Echec du telechargement du CSV")
                     return results
 
-            except Exception as e:
-                print(f"[ERREUR] Erreur durant le telechargement: {e}")
+            except DOWNLOAD_ERRORS as error:
+                print(f"[ERREUR] Erreur durant le telechargement: {error}")
                 traceback.print_exc()
                 return results
 
             finally:
-                # Fermer le navigateur
+                # Fermer le navigateur sans attraper trop large
                 if driver:
-                    try:
+                    with suppress(*QUIT_ERRORS):
                         driver.quit()
-                        print("[INFO] Navigateur ferme")
-                    except Exception:
-                        pass
+                    print("[INFO] Navigateur ferme")
 
         else:
             if csv_file:
                 print(f"\n[INFO] Utilisation du fichier CSV fourni: {csv_file}")
                 results['csv_path'] = csv_file
             else:
-                print("\n[INFO] Telechargement saute, utilisation du dernier CSV disponible")
+                print(
+                    "\n[INFO] Telechargement saute, "
+                    "utilisation du dernier CSV disponible"
+                )
                 results['csv_path'] = str(config.get_latest_csv())
 
             results['download_success'] = True
@@ -139,8 +170,8 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 print("[ERREUR] Echec de l'analyse")
                 return results
 
-        except Exception as e:
-            print(f"[ERREUR] Erreur durant l'analyse: {e}")
+        except ANALYSIS_ERRORS as error:
+            print(f"[ERREUR] Erreur durant l'analyse: {error}")
             traceback.print_exc()
             return results
 
@@ -168,13 +199,17 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 else:
                     print("[WARNING] Aucune notification n'a pu etre envoyee")
 
-            except Exception as e:
-                print(f"[ERREUR] Erreur durant l'envoi des notifications: {e}")
+            except NOTIFICATION_ERRORS as error:
+                print(f"[ERREUR] Erreur durant l'envoi des notifications: {error}")
+                traceback.print_exc()
+            except ImportError:
+                print("[ERREUR] Erreur inattendue durant l'envoi des notifications")
                 traceback.print_exc()
 
         else:
             print("\n[INFO] Envoi des notifications saute")
-            results['notification_success'] = True  # Considéré comme succès car sauté volontairement
+            # Considéré comme succès car sauté volontairement
+            results['notification_success'] = True
 
         # RÉSUMÉ FINAL
         print("\n" + "=" * 80)
@@ -202,18 +237,32 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
         if driver:
             try:
                 driver.quit()
-            except Exception:
-                pass
+            except (AttributeError, OSError, RuntimeError, WebDriverException) as quit_error:
+                print(f"[WARNING] Impossible de fermer le navigateur proprement: {quit_error}")
+            except ImportError
+                print("[WARNING] Erreur inattendue lors de la fermeture")
         return results
 
-    except Exception as e:
-        print(f"\n[ERREUR FATALE] Erreur inattendue: {e}")
+    except GENERAL_WORKFLOW_ERRORS as error:
+        print(f"\n[ERREUR FATALE] Erreur inattendue: {error}")
         traceback.print_exc()
         if driver:
             try:
                 driver.quit()
-            except Exception:
-                pass
+            except (AttributeError, OSError, RuntimeError, WebDriverException) as quit_error:
+                print(f"[WARNING] Impossible de fermer le navigateur proprement: {quit_error}")
+            except ImportError:
+                print(f"[WARNING] Erreur inattendue lors de la fermeture: {quit_error}")
+        return results
+
+    except ImportError:
+        print(f"\n[ERREUR FATALE] Erreur non gérée: {error}")
+        traceback.print_exc()
+        if driver:
+            try:
+                driver.quit()
+            except ImportError:
+                print(f"[WARNING] Erreur lors de la fermeture: {quit_error}")
         return results
 
 
@@ -223,30 +272,26 @@ def main():
     parser = argparse.ArgumentParser(
         description="Linxo Agent - Analyse automatique des depenses",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Exemples d'utilisation:
-
-  # Workflow complet (téléchargement + analyse + notifications)
-  python linxo_agent.py
-
-  # Analyser un CSV existant sans télécharger
-  python linxo_agent.py --skip-download
-
-  # Analyser un fichier CSV spécifique
-  python linxo_agent.py --csv-file /path/to/file.csv
-
-  # Analyser sans envoyer de notifications (test)
-  python linxo_agent.py --skip-notifications
-
-  # Analyser un CSV sans envoyer de notifications
-  python linxo_agent.py --csv-file data/export.csv --skip-notifications
-        """
+        epilog=(
+            "\nExemples d'utilisation:\n\n"
+            "  # Workflow complet (téléchargement + analyse + notifications)\n"
+            "  python linxo_agent.py\n\n"
+            "  # Analyser un CSV existant sans télécharger\n"
+            "  python linxo_agent.py --skip-download\n\n"
+            "  # Analyser un fichier CSV spécifique\n"
+            "  python linxo_agent.py --csv-file /path/to/file.csv\n\n"
+            "  # Analyser sans envoyer de notifications (test)\n"
+            "  python linxo_agent.py --skip-notifications\n\n"
+            "  # Analyser un CSV sans envoyer de notifications\n"
+            "  python linxo_agent.py --csv-file data/export.csv --skip-notifications\n"
+        )
     )
-
     parser.add_argument(
         '--skip-download',
         action='store_true',
-        help="Sauter le telechargement et utiliser le dernier CSV disponible"
+        help=(
+            "Sauter le telechargement et utiliser le dernier CSV disponible"
+        )
     )
 
     parser.add_argument(

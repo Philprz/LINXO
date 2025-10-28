@@ -36,6 +36,19 @@ EXCLUSIONS = {
         r'VIR\s+INST.*INTERNE',
         r'VIREMENT.*INTERNE',
     ],
+    'preautorisation_carburant': [
+        # Détection des préautorisations carburant (montants ronds typiques)
+        # Auchan, Carrefour, Leclerc, Intermarché, etc.
+        (r'AUCHAN', [150.0, 120.0]),
+        (r'CARREFOUR', [150.0, 120.0]),
+        (r'LECLERC', [150.0, 120.0]),
+        (r'INTERMARCHE', [150.0, 120.0]),
+        (r'SUPER\s*U', [150.0, 120.0]),
+        (r'TOTAL', [150.0, 120.0]),
+        (r'SHELL', [150.0, 120.0]),
+        (r'ESSO', [150.0, 120.0]),
+        (r'BP\s', [150.0, 120.0]),
+    ],
     'categories_exclues': [
         'Prél. carte débit différé',
         'Prél. carte debit differe',
@@ -52,9 +65,15 @@ EXCEPTIONS_VARIABLES = [
 ]
 
 
-def doit_exclure_transaction(libelle, categorie="", notes=""):
+def doit_exclure_transaction(libelle, categorie="", notes="", montant=0.0):
     """
     Vérifie si une transaction doit être exclue de l'analyse
+
+    Args:
+        libelle: Libellé de la transaction
+        categorie: Catégorie de la transaction
+        notes: Notes de la transaction
+        montant: Montant de la transaction (pour détecter préautorisations)
 
     Returns:
         tuple: (bool, str) - (doit_exclure, raison)
@@ -85,6 +104,15 @@ def doit_exclure_transaction(libelle, categorie="", notes=""):
     # Vérifier les virements internes dans les notes
     if "INTERNE" in notes_upper and ("VIR" in notes_upper or "VIREMENT" in notes_upper):
         return True, "Virement interne (detecte dans notes)"
+
+    # Vérifier les préautorisations carburant
+    montant_abs = abs(montant)
+    for pattern, montants_suspects in EXCLUSIONS['preautorisation_carburant']:
+        if re.search(pattern, libelle_upper, re.IGNORECASE):
+            # Si le montant correspond à un montant de préautorisation typique
+            for montant_preauth in montants_suspects:
+                if abs(montant_abs - montant_preauth) < 0.01:  # Tolérance de 1 centime
+                    return True, f"Preautorisation carburant ({montant_preauth}E)"
 
     return False, None
 
@@ -236,7 +264,9 @@ def lire_csv_linxo(csv_path):
                 libelle_complet = f"{libelle} {notes}".strip()
 
                 # Vérifier si la transaction doit être exclue
-                doit_exclure, raison = doit_exclure_transaction(libelle_complet, categorie, notes)
+                doit_exclure, raison = doit_exclure_transaction(
+                    libelle_complet, categorie, notes, montant
+                )
 
                 transaction = {
                     'date': date,

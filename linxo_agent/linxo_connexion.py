@@ -21,6 +21,145 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from config import get_config
 
+# Import du module 2FA
+try:
+    from linxo_2fa import recuperer_code_2fa_email
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from linxo_2fa import recuperer_code_2fa_email
+
+
+def _gerer_2fa(driver, wait):
+    """
+    Gère l'étape de vérification 2FA automatiquement
+
+    Args:
+        driver: Instance du WebDriver Selenium
+        wait: Instance de WebDriverWait
+
+    Returns:
+        bool: True si 2FA réussi et connexion OK, False sinon
+    """
+    print("\n[2FA] Gestion du 2FA...")
+
+    try:
+        # Récupérer le code 2FA depuis l'email
+        code_2fa = recuperer_code_2fa_email(timeout=120, check_interval=5)
+
+        if not code_2fa:
+            print("[ERREUR] Impossible de récupérer le code 2FA")
+            return False
+
+        print(f"[2FA] Code récupéré: {code_2fa}")
+
+        # Chercher le champ de saisie du code 2FA
+        code_field = None
+
+        # Méthode 1: Par nom "code"
+        try:
+            code_field = wait.until(
+                EC.presence_of_element_located((By.NAME, "code"))
+            )
+            print("[2FA] Champ code trouvé (par name)")
+        except:
+            pass
+
+        # Méthode 2: Par ID "code"
+        if not code_field:
+            try:
+                code_field = driver.find_element(By.ID, "code")
+                print("[2FA] Champ code trouvé (par ID)")
+            except:
+                pass
+
+        # Méthode 3: Par type "text" et placeholder
+        if not code_field:
+            try:
+                code_field = driver.find_element(
+                    By.CSS_SELECTOR,
+                    "input[type='text'][placeholder*='code' i]"
+                )
+                print("[2FA] Champ code trouvé (par CSS)")
+            except:
+                pass
+
+        # Méthode 4: Premier champ input de type text visible
+        if not code_field:
+            try:
+                code_field = driver.find_element(By.CSS_SELECTOR, "input[type='text']")
+                print("[2FA] Champ code trouvé (input text)")
+            except:
+                pass
+
+        if not code_field:
+            print("[ERREUR] Champ de saisie du code 2FA introuvable")
+            return False
+
+        # Saisir le code
+        code_field.clear()
+        code_field.send_keys(code_2fa)
+        print("[2FA] Code saisi")
+        time.sleep(2)
+
+        # Chercher et cliquer sur le bouton de validation
+        submit_button = None
+
+        # Méthode 1: Par texte "Valider", "Confirmer", "Vérifier"
+        for button_text in ["Valider", "Confirmer", "Vérifier", "Envoyer", "Continuer"]:
+            try:
+                submit_button = driver.find_element(
+                    By.XPATH,
+                    f"//button[contains(text(), '{button_text}')]"
+                )
+                print(f"[2FA] Bouton '{button_text}' trouvé")
+                break
+            except:
+                pass
+
+        # Méthode 2: Par type submit
+        if not submit_button:
+            try:
+                submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+                print("[2FA] Bouton submit trouvé")
+            except:
+                pass
+
+        # Méthode 3: N'importe quel bouton
+        if not submit_button:
+            try:
+                submit_button = driver.find_element(By.TAG_NAME, "button")
+                print("[2FA] Bouton générique trouvé")
+            except:
+                pass
+
+        if not submit_button:
+            print("[WARNING] Bouton de validation 2FA introuvable, tentative Enter")
+            # Essayer d'envoyer avec la touche Enter
+            from selenium.webdriver.common.keys import Keys
+            code_field.send_keys(Keys.RETURN)
+        else:
+            submit_button.click()
+            print("[2FA] Bouton de validation cliqué")
+
+        # Attendre la redirection
+        time.sleep(8)
+
+        print(f"[2FA] URL après validation: {driver.current_url}")
+
+        # Vérifier si connecté
+        if 'login' not in driver.current_url.lower() and 'auth' not in driver.current_url.lower() and '2fa' not in driver.current_url.lower():
+            print("[SUCCESS] Connexion réussie après 2FA!")
+            return True
+        else:
+            print("[ERREUR] Échec de la validation 2FA")
+            return False
+
+    except Exception as e:
+        print(f"[ERREUR] Erreur lors de la gestion du 2FA: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 
 def se_connecter_linxo(driver, wait, email=None, password=None):
     """
@@ -109,13 +248,39 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
 
         print(f"[OK] URL apres connexion: {driver.current_url}")
 
+        # Vérifier si on est sur une page 2FA
+        if '2fa' in driver.current_url.lower() or 'verification' in driver.current_url.lower():
+            print("[2FA] Page de vérification 2FA détectée")
+            return _gerer_2fa(driver, wait)
+
         # Vérifier si connecté (on ne doit plus être sur la page de login)
         if 'login' not in driver.current_url.lower() and 'auth' not in driver.current_url.lower():
             print("[SUCCESS] Connexion reussie!")
             return True
-        else:
-            print("[ERREUR] Echec de la connexion (toujours sur la page de login)")
-            return False
+
+        # Peut-être qu'on est sur une page 2FA sans l'URL explicite
+        # Chercher un champ de code 2FA
+        try:
+            code_field = driver.find_element(By.NAME, "code")
+            print("[2FA] Champ de code 2FA détecté")
+            return _gerer_2fa(driver, wait)
+        except:
+            pass
+
+        try:
+            code_field = driver.find_element(By.ID, "code")
+            print("[2FA] Champ de code 2FA détecté (par ID)")
+            return _gerer_2fa(driver, wait)
+        except:
+            pass
+
+        # Vérifier par texte dans la page
+        if 'code' in driver.page_source.lower() and 'verification' in driver.page_source.lower():
+            print("[2FA] Page de vérification détectée (par contenu)")
+            return _gerer_2fa(driver, wait)
+
+        print("[ERREUR] Echec de la connexion (toujours sur la page de login)")
+        return False
 
     except Exception as e:
         print(f"[ERREUR] Erreur lors de la connexion: {e}")
