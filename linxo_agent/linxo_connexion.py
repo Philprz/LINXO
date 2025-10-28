@@ -448,8 +448,10 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
 
         submit_button.click()
 
-        # Attendre la redirection (augmenter le délai)
-        time.sleep(5)
+        # Attendre la redirection (délai important pour laisser le temps au 2FA)
+        # En mode headless, la page peut mettre plus de temps à se charger
+        print("[INFO] Attente de la redirection...")
+        time.sleep(8)  # Augmenter à 8 secondes pour le 2FA
 
         # Sauvegarder un screenshot après le clic
         try:
@@ -468,38 +470,59 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
             print("[DEBUG] Extrait de la page:")
             print(driver.page_source[:500])
 
-        # Vérifier si on est sur une page 2FA
+        # ÉTAPE 1: Vérifier si on est sur une page 2FA (par URL)
         current_url_lower = driver.current_url.lower()
         if '2fa' in current_url_lower or 'verification' in current_url_lower:
-            print("[2FA] Page de vérification 2FA détectée")
+            print("[2FA] Page de vérification 2FA détectée (par URL)")
             return _gerer_2fa(driver, wait)
 
-        # Vérifier si connecté (on ne doit plus être sur la page de login)
-        if 'login' not in current_url_lower and 'auth' not in current_url_lower:
-            print("[SUCCESS] Connexion reussie!")
-            return True
-
-        # Peut-être qu'on est sur une page 2FA sans l'URL explicite
-        # Chercher un champ de code 2FA
+        # ÉTAPE 2: Chercher un champ de code 2FA (même si l'URL ne change pas)
+        # Ceci est crucial car Linxo peut afficher le 2FA sur la même URL
         try:
             driver.find_element(By.NAME, "code")
-            print("[2FA] Champ de code 2FA détecté")
+            print("[2FA] Champ de code 2FA détecté (par name='code')")
             return _gerer_2fa(driver, wait)
         except NoSuchElementException:
             pass
 
         try:
             driver.find_element(By.ID, "code")
-            print("[2FA] Champ de code 2FA détecté (par ID)")
+            print("[2FA] Champ de code 2FA détecté (par id='code')")
             return _gerer_2fa(driver, wait)
         except NoSuchElementException:
             pass
 
-        # Vérifier par texte dans la page
+        # Chercher par placeholder (ex: "Entrez le code")
+        try:
+            code_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='code' i]")
+            if code_input.is_displayed():
+                print("[2FA] Champ de code 2FA détecté (par placeholder)")
+                return _gerer_2fa(driver, wait)
+        except NoSuchElementException:
+            pass
+
+        # ÉTAPE 3: Vérifier par texte dans la page
         page_source_lower = driver.page_source.lower()
-        if 'code' in page_source_lower and 'verification' in page_source_lower:
-            print("[2FA] Page de vérification détectée (par contenu)")
-            return _gerer_2fa(driver, wait)
+
+        # Rechercher des mots-clés spécifiques au 2FA
+        keywords_2fa = [
+            ('code', 'verification'),
+            ('code', 'validation'),
+            ('double authentification', ''),
+            ('authentification forte', ''),
+            ('code de sécurité', ''),
+            ('code reçu par', ''),
+        ]
+
+        for keyword1, keyword2 in keywords_2fa:
+            if keyword1 in page_source_lower and (not keyword2 or keyword2 in page_source_lower):
+                print(f"[2FA] Page de vérification détectée (mots-clés: '{keyword1}' + '{keyword2}')")
+                return _gerer_2fa(driver, wait)
+
+        # ÉTAPE 4: Vérifier si connecté (on ne doit plus être sur la page de login)
+        if 'login' not in current_url_lower and 'auth' not in current_url_lower:
+            print("[SUCCESS] Connexion reussie!")
+            return True
 
         print("[ERREUR] Echec de la connexion (toujours sur la page de login)")
 

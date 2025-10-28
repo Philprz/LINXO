@@ -4,6 +4,7 @@
 # Web Automation
 selenium==4.15.2
 webdriver-manager==4.0.1
+undetected-chromedriver>=3.5.0  # For bypassing anti-bot detection
 
 # HTTP Requests
 requests==2.31.0
