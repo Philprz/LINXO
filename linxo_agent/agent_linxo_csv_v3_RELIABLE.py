@@ -184,60 +184,81 @@ def lire_csv_linxo(fichier_csv):
     transactions = []
     exclus = []
 
+    # Détecter l'encodage du fichier
+    encodings_to_try = ['utf-8-sig', 'utf-16', 'utf-8', 'latin-1', 'cp1252']
+    content = None
+    used_encoding = None
+
+    for encoding in encodings_to_try:
+        try:
+            with open(fichier_csv, 'r', encoding=encoding) as f:
+                content = f.read()
+                used_encoding = encoding
+                break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+
+    if content is None:
+        print(f"❌ Impossible de lire le fichier avec les encodages testés: {encodings_to_try}")
+        return [], []
+
+    print(f"✓ Fichier CSV lu avec l'encodage: {used_encoding}")
+
     try:
-        with open(fichier_csv, 'r', encoding='utf-8') as f:
-            sample = f.read(1024)
-            f.seek(0)
+        # Détecter le délimiteur
+        sample = content[:1024]
+        delimiter = '\t' if '\t' in sample else ','
+        if ';' in sample:
+            delimiter = ';'
 
-            delimiter = '\t' if '\t' in sample else ','
-            if ';' in sample:
-                delimiter = ';'
+        # Lire le CSV depuis le contenu en mémoire
+        import io
+        f = io.StringIO(content)
+        reader = csv.DictReader(f, delimiter=delimiter)
 
-            reader = csv.DictReader(f, delimiter=delimiter)
+        for row in reader:
+            date_str = row.get('Date', '')
+            libelle = row.get('Libellé', '')
+            notes = row.get('Notes', '')
+            montant_str = row.get('Montant', '0')
+            categorie = row.get('Catégorie', '')
+            compte = row.get('Nom du compte', '')
+            labels = row.get('Labels', '')
 
-            for row in reader:
-                date_str = row.get('Date', '')
-                libelle = row.get('Libellé', '')
-                notes = row.get('Notes', '')
-                montant_str = row.get('Montant', '0')
-                categorie = row.get('Catégorie', '')
-                compte = row.get('Nom du compte', '')
-                labels = row.get('Labels', '')
+            montant_str = montant_str.replace(',', '.').replace(' ', '').replace('€', '')
+            try:
+                montant = float(montant_str)
+            except (ValueError, TypeError):
+                montant = 0.0
 
-                montant_str = montant_str.replace(',', '.').replace(' ', '').replace('€', '')
-                try:
-                    montant = float(montant_str)
-                except (ValueError, TypeError):
-                    montant = 0.0
+            try:
+                date = datetime.strptime(date_str, '%d/%m/%Y')
+            except (ValueError, TypeError):
+                date = None
 
-                try:
-                    date = datetime.strptime(date_str, '%d/%m/%Y')
-                except (ValueError, TypeError):
-                    date = None
+            libelle_complet = f"{libelle} {notes}".strip()
 
-                libelle_complet = f"{libelle} {notes}".strip()
+            # Vérifier si la transaction doit être exclue
+            doit_exclure, raison = doit_exclure_transaction(libelle_complet, categorie, notes)
 
-                # Vérifier si la transaction doit être exclue
-                doit_exclure, raison = doit_exclure_transaction(libelle_complet, categorie, notes)
+            transaction = {
+                'date': date,
+                'date_str': date_str,
+                'libelle': libelle,
+                'libelle_complet': libelle_complet,
+                'montant': montant,
+                'categorie': categorie,
+                'compte': compte,
+                'labels': labels,
+                'notes': notes
+            }
 
-                transaction = {
-                    'date': date,
-                    'date_str': date_str,
-                    'libelle': libelle,
-                    'libelle_complet': libelle_complet,
-                    'montant': montant,
-                    'categorie': categorie,
-                    'compte': compte,
-                    'labels': labels,
-                    'notes': notes
-                }
-
-                if doit_exclure:
-                    transaction['raison_exclusion'] = raison
-                    exclus.append(transaction)
-                    print(f"⊘  EXCLU: {libelle_complet[:50]:50} | {montant:8.2f}€ | {raison}")
-                else:
-                    transactions.append(transaction)
+            if doit_exclure:
+                transaction['raison_exclusion'] = raison
+                exclus.append(transaction)
+                print(f"⊘  EXCLU: {libelle_complet[:50]:50} | {montant:8.2f}€ | {raison}")
+            else:
+                transactions.append(transaction)
 
         print(f"\n✅ {len(transactions)} transactions valides (+ {len(exclus)} exclues)")
         return transactions, exclus
