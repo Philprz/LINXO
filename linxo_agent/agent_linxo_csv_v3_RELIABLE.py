@@ -9,6 +9,7 @@ import json
 import csv
 import re
 import sys
+import os
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
@@ -16,18 +17,33 @@ from email.mime.multipart import MIMEMultipart
 import calendar
 from pathlib import Path
 
-# Importer le module de configuration
-sys.path.insert(0, str(Path(__file__).parent))
-from config import get_config
+# Détection automatique de l'environnement
+def _detect_base_dir():
+    """Détecte le répertoire de base selon l'environnement"""
+    if sys.platform.startswith('linux'):
+        # VPS Linux
+        if os.path.exists('/home/linxo/LINXO'):
+            return Path('/home/linxo/LINXO')
+        elif os.path.exists('/home/ubuntu'):
+            return Path('/home/ubuntu')
+    # Local (Windows ou autre)
+    return Path(__file__).parent.parent
 
-# Charger la configuration
-_config = get_config()
+_BASE_DIR = _detect_base_dir()
+_LINXO_AGENT_DIR = _BASE_DIR / 'linxo_agent' if _BASE_DIR.name != 'linxo_agent' else _BASE_DIR
 
-# Configuration - Utilise les chemins dynamiques du module config
-CONFIG_FILE = str(_config.config_linxo_file)
-DEPENSES_FILE = str(_config.depenses_file)
-CSV_FILE = str(_config.get_latest_csv())
-API_SECRETS_FILE = str(_config.api_secrets_file)
+# Configuration avec chemins dynamiques
+CONFIG_FILE = str(_LINXO_AGENT_DIR / 'config_linxo.json')
+DEPENSES_FILE = str(_LINXO_AGENT_DIR / 'depenses_recurrentes.json')
+CSV_FILE = str(_BASE_DIR / 'data' / 'latest.csv')
+
+# API Secrets selon l'environnement
+if sys.platform.startswith('linux') and os.path.exists('/home/linxo/.api_secret_infos'):
+    API_SECRETS_FILE = '/home/linxo/.api_secret_infos/api_secrets.json'
+elif sys.platform.startswith('linux') and os.path.exists('/home/ubuntu/.api_secret_infos'):
+    API_SECRETS_FILE = '/home/ubuntu/.api_secret_infos/api_secrets.json'
+else:
+    API_SECRETS_FILE = str(_BASE_DIR / 'api_secrets.json')
 
 # Seuils de tolérance
 SEUIL_SIMILARITE = 0.6  # 60% de similarité minimum pour matcher
@@ -614,7 +630,9 @@ def main():
     print("\n" + rapport)
     
     # Sauvegarder le rapport
-    rapport_file = _config.reports_dir / f"rapport_linxo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    reports_dir = _BASE_DIR / 'reports'
+    reports_dir.mkdir(exist_ok=True)
+    rapport_file = reports_dir / f"rapport_linxo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
     with open(rapport_file, 'w', encoding='utf-8') as f:
         f.write(rapport)
     print(f"\n💾 Rapport sauvegardé: {rapport_file}")
