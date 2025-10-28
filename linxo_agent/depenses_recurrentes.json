@@ -245,7 +245,7 @@
       "compte": "Boursobank",
       "identifiant": "Cath",
       "commentaire": "AssuranceVie Gestion Rotschild",
-      "montant": 100.0,
+      "montant": 200.0,
       "categorie": "Epargne"
     },
     {
@@ -253,7 +253,7 @@
       "compte": "Boursobank",
       "identifiant": "Phil",
       "commentaire": "AssuranceVie Gestion Rotschild",
-      "montant": 200.0,
+      "montant": 400.0,
       "categorie": "Epargne"
     }
   ],
