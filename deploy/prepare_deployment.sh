@@ -60,12 +60,24 @@ if [ ! -d "linxo_agent" ]; then
     exit 1
 fi
 
-# Copie des fichiers Python (uniquement les versions RELIABLE)
+# Copie des modules principaux (architecture moderne)
+cp linxo_agent/analyzer.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "analyzer.py non trouvé"
+cp linxo_agent/notifications.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "notifications.py non trouvé"
+cp linxo_agent/report_formatter_v2.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "report_formatter_v2.py non trouvé"
+cp linxo_agent/config.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "config.py non trouvé"
+
+# Copie des modules de connexion
 cp linxo_agent/linxo_connexion.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "linxo_connexion.py non trouvé"
-cp linxo_agent/agent_linxo_csv_v3_RELIABLE.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "agent_linxo_csv_v3_RELIABLE.py non trouvé"
-cp linxo_agent/run_linxo_e2e.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "run_linxo_e2e.py non trouvé"
+cp linxo_agent/linxo_driver_factory.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "linxo_driver_factory.py non trouvé"
+cp linxo_agent/linxo_2fa.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "linxo_2fa.py non trouvé"
+cp linxo_agent/linxo_connexion_undetected.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "linxo_connexion_undetected.py non trouvé"
+
+# Copie des orchestrateurs
 cp linxo_agent/run_analysis.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "run_analysis.py non trouvé"
-cp linxo_agent/send_notifications.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "send_notifications.py non trouvé"
+cp linxo_agent.py "$DEPLOY_DIR/" 2>/dev/null || log_warn "linxo_agent.py non trouvé"
+
+# Copie des utilitaires
+cp linxo_agent/__init__.py "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "__init__.py non trouvé"
 
 # Copie des fichiers de configuration
 log_info "Copie des fichiers de configuration..."
@@ -77,7 +89,7 @@ cp deploy/api_secrets.json.example "$DEPLOY_DIR/linxo_agent/api_secrets.json.exa
 
 # Copie de la documentation
 log_info "Copie de la documentation..."
-cp linxo_agent/README_V3_RELIABLE.md "$DEPLOY_DIR/linxo_agent/" 2>/dev/null || log_warn "README_V3_RELIABLE.md non trouvé"
+cp MIGRATION_VPS_HTML.md "$DEPLOY_DIR/" 2>/dev/null || log_warn "MIGRATION_VPS_HTML.md non trouvé"
 
 # Copie des scripts de déploiement
 log_info "Copie des scripts de déploiement..."
@@ -93,7 +105,7 @@ cp requirements.txt "$DEPLOY_DIR/" 2>/dev/null || log_warn "requirements.txt non
 cp .env.example "$DEPLOY_DIR/" 2>/dev/null || log_warn ".env.example non trouvé"
 cp .gitignore "$DEPLOY_DIR/" 2>/dev/null || log_warn ".gitignore non trouvé"
 cp README.md "$DEPLOY_DIR/" 2>/dev/null || log_warn "README.md non trouvé"
-cp GUIDE_DEPLOIEMENT_VPS.md "$DEPLOY_DIR/" 2>/dev/null || log_warn "GUIDE_DEPLOIEMENT_VPS.md non trouvé"
+cp MIGRATION_VPS_HTML.md "$DEPLOY_DIR/" 2>/dev/null || log_warn "MIGRATION_VPS_HTML.md non trouvé"
 
 ###############################################################################
 # Création de README pour le déploiement
@@ -103,18 +115,25 @@ log_info "Création du README de déploiement..."
 
 cat > "$DEPLOY_DIR/DEPLOYMENT_README.txt" <<'EOF'
 =============================================================================
-  LINXO AGENT - PACKAGE DE DÉPLOIEMENT
+  LINXO AGENT - PACKAGE DE DÉPLOIEMENT (VERSION MODERNE)
 =============================================================================
 
 Ce package contient tous les fichiers nécessaires pour déployer
-Linxo Agent sur votre VPS OVH.
+Linxo Agent sur votre VPS avec le système moderne (emails HTML).
 
 CONTENU :
 ---------
-  linxo_agent/          Fichiers Python de l'application
-  deploy/               Scripts d'installation et configuration
-  requirements.txt      Dépendances Python
-  GUIDE_DEPLOIEMENT_VPS.md   Guide complet de déploiement
+  linxo_agent/                Modules Python (architecture moderne)
+    ├── analyzer.py           Analyse des dépenses
+    ├── notifications.py      Email HTML + SMS
+    ├── report_formatter_v2.py  Formatage HTML
+    ├── config.py             Configuration unifiée
+    └── run_analysis.py       Orchestrateur moderne
+
+  deploy/                     Scripts d'installation et configuration
+  linxo_agent.py              Workflow complet (connexion + analyse)
+  requirements.txt            Dépendances Python
+  MIGRATION_VPS_HTML.md       Guide de migration
 
 ÉTAPES DE DÉPLOIEMENT :
 -----------------------
@@ -195,9 +214,9 @@ echo "📦 Archive : /tmp/$ARCHIVE_NAME"
 echo "📊 Taille : $ARCHIVE_SIZE"
 echo ""
 echo "Contenu :"
-echo "  ✅ Fichiers Python (versions RELIABLE uniquement)"
+echo "  ✅ Modules Python (architecture moderne)"
 echo "  ✅ Scripts d'installation et configuration"
-echo "  ✅ Documentation complète"
+echo "  ✅ Guide de migration vers emails HTML"
 echo "  ✅ Fichiers de configuration (exemples)"
 echo ""
 echo "Prochaines étapes :"

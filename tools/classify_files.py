@@ -84,8 +84,8 @@ class FileClassifier:
         # Core Python modules in linxo_agent/
         if rel_path.parts[0] == 'linxo_agent' and file_name.endswith('.py'):
             core_modules = {'config.py', 'analyzer.py', 'notifications.py', 'linxo_connexion.py',
-                          'report_formatter_v2.py', 'agent_linxo_csv_v3_RELIABLE.py',
-                          'run_linxo_e2e.py', 'run_analysis.py'}
+                          'report_formatter_v2.py', 'linxo_driver_factory.py', 'linxo_2fa.py',
+                          'linxo_connexion_undetected.py', 'run_analysis.py', '__init__.py'}
             if file_name in core_modules:
                 self.keep_files.append((rel_str, "Core application module"))
                 return
