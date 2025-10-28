@@ -14,10 +14,18 @@ import os
 import re
 import socket
 import ssl
+import sys
 import time
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 
-from linxo_agent.config import get_config
+# Gestion des imports avec conflit de nommage
+try:
+    from .config import get_config
+except ImportError:
+    # Fallback si importé depuis un autre contexte
+    sys.path.insert(0, str(Path(__file__).parent))
+    from config import get_config  # type: ignore
 
 
 def recuperer_code_2fa_email(timeout: int = 120, check_interval: int = 5) -> str | None:

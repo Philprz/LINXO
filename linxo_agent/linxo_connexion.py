@@ -191,22 +191,25 @@ def _gerer_2fa(driver, wait):
         # Chercher le champ de saisie du code 2FA
         code_field = None
 
+        print(f"[2FA] URL actuelle: {driver.current_url}")
+        print("[2FA] Recherche du champ de saisie...")
+
         # Méthode 1: Par nom "code"
         try:
             code_field = wait.until(
                 EC.presence_of_element_located((By.NAME, "code"))
             )
             print("[2FA] Champ code trouvé (par name)")
-        except ImportError:
-            pass
+        except (TimeoutException, NoSuchElementException) as e:
+            print(f"[DEBUG] Méthode 1 échouée: {e}")
 
         # Méthode 2: Par ID "code"
         if not code_field:
             try:
                 code_field = driver.find_element(By.ID, "code")
                 print("[2FA] Champ code trouvé (par ID)")
-            except ImportError:
-                pass
+            except NoSuchElementException as e:
+                print(f"[DEBUG] Méthode 2 échouée: {e}")
 
         # Méthode 3: Par type "text" et placeholder
         if not code_field:
@@ -216,19 +219,42 @@ def _gerer_2fa(driver, wait):
                     "input[type='text'][placeholder*='code' i]"
                 )
                 print("[2FA] Champ code trouvé (par CSS)")
-            except ImportError:
-                pass
+            except NoSuchElementException as e:
+                print(f"[DEBUG] Méthode 3 échouée: {e}")
 
-        # Méthode 4: Premier champ input de type text visible
+        # Méthode 4: N'importe quel input type="text"
         if not code_field:
             try:
                 code_field = driver.find_element(By.CSS_SELECTOR, "input[type='text']")
                 print("[2FA] Champ code trouvé (input text)")
-            except ImportError:
-                pass
+            except NoSuchElementException as e:
+                print(f"[DEBUG] Méthode 4 échouée: {e}")
+
+        # Méthode 5: N'importe quel input type="number" (parfois utilisé pour les codes)
+        if not code_field:
+            try:
+                code_field = driver.find_element(By.CSS_SELECTOR, "input[type='number']")
+                print("[2FA] Champ code trouvé (input number)")
+            except NoSuchElementException as e:
+                print(f"[DEBUG] Méthode 5 échouée: {e}")
+
+        # Méthode 6: N'importe quel input
+        if not code_field:
+            try:
+                code_field = driver.find_element(By.TAG_NAME, "input")
+                print("[2FA] Champ code trouvé (input générique)")
+            except NoSuchElementException as e:
+                print(f"[DEBUG] Méthode 6 échouée: {e}")
 
         if not code_field:
             print("[ERREUR] Champ de saisie du code 2FA introuvable")
+            print("[DEBUG] Sauvegarde du HTML de la page pour diagnostic...")
+            try:
+                with open("/tmp/2fa_page.html", "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+                print("[DEBUG] HTML sauvegardé dans /tmp/2fa_page.html")
+            except Exception as save_error:
+                print(f"[WARN] Impossible de sauvegarder le HTML: {save_error}")
             return False
 
         # Saisir le code
@@ -240,6 +266,8 @@ def _gerer_2fa(driver, wait):
         # Chercher et cliquer sur le bouton de validation
         submit_button = None
 
+        print("[2FA] Recherche du bouton de validation...")
+
         # Méthode 1: Par texte "Valider", "Confirmer", "Vérifier"
         for button_text in ["Valider", "Confirmer", "Vérifier", "Envoyer", "Continuer"]:
             try:
@@ -249,7 +277,7 @@ def _gerer_2fa(driver, wait):
                 )
                 print(f"[2FA] Bouton '{button_text}' trouvé")
                 break
-            except ImportError:
+            except NoSuchElementException:
                 pass
 
         # Méthode 2: Par type submit
@@ -257,7 +285,7 @@ def _gerer_2fa(driver, wait):
             try:
                 submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
                 print("[2FA] Bouton submit trouvé")
-            except ImportError:
+            except NoSuchElementException:
                 pass
 
         # Méthode 3: N'importe quel bouton
@@ -265,7 +293,7 @@ def _gerer_2fa(driver, wait):
             try:
                 submit_button = driver.find_element(By.TAG_NAME, "button")
                 print("[2FA] Bouton générique trouvé")
-            except ImportError:
+            except NoSuchElementException:
                 pass
 
         if not submit_button:
@@ -282,6 +310,14 @@ def _gerer_2fa(driver, wait):
 
         print(f"[2FA] URL après validation: {driver.current_url}")
 
+        # Sauvegarder un screenshot pour debug
+        try:
+            screenshot_path = "/tmp/2fa_after_submit.png"
+            driver.save_screenshot(screenshot_path)
+            print(f"[DEBUG] Screenshot sauvegardé: {screenshot_path}")
+        except Exception as screenshot_error:
+            print(f"[WARN] Impossible de sauvegarder le screenshot: {screenshot_error}")
+
         # Vérifier si connecté
         current_url_lower = driver.current_url.lower()
         if ('login' not in current_url_lower and
@@ -290,11 +326,20 @@ def _gerer_2fa(driver, wait):
             print("[SUCCESS] Connexion réussie après 2FA!")
             return True
 
-        print("[ERREUR] Échec de la validation 2FA")
+        # Vérifier s'il y a un message d'erreur sur la page
+        page_source_lower = driver.page_source.lower()
+        if 'incorrect' in page_source_lower or 'invalide' in page_source_lower or 'erreur' in page_source_lower:
+            print("[ERREUR] Code 2FA incorrect ou invalide détecté sur la page")
+        else:
+            print("[ERREUR] Échec de la validation 2FA (raison inconnue)")
+
+        print("[DEBUG] Contenu de la page pour diagnostic:")
+        print(driver.page_source[:500])  # Afficher les 500 premiers caractères
+
         return False
 
-    except ImportError:
-        print("[ERREUR] Erreur lors de la gestion du 2FA: ")
+    except Exception as e:
+        print(f"[ERREUR] Erreur lors de la gestion du 2FA: {e}")
         traceback.print_exc()
         return False
 
@@ -340,16 +385,16 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
                 EC.presence_of_element_located((By.NAME, "username"))
             )
             print("[OK] Champ username trouve")
-        except ImportError:
-            print("[ERREUR] Champ username non trouve: ")
+        except (TimeoutException, NoSuchElementException) as e:
+            print(f"[ERREUR] Champ username non trouve: {e}")
             return False
 
         # Chercher le champ password (name="password")
         try:
             password_field = driver.find_element(By.NAME, "password")
             print("[OK] Champ password trouve")
-        except ImportError:
-            print("[ERREUR] Champ password non trouve: ")
+        except NoSuchElementException as e:
+            print(f"[ERREUR] Champ password non trouve: {e}")
             return False
 
         # Remplir les champs
@@ -372,13 +417,13 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
                 )
             )
             print("[OK] Bouton 'Je me connecte' trouve")
-        except ImportError:
+        except (TimeoutException, NoSuchElementException):
             # Fallback: chercher par type submit
             try:
                 submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
                 print("[OK] Bouton submit trouve")
-            except ImportError:
-                print("[ERREUR] Bouton de connexion non trouve: ")
+            except NoSuchElementException as e:
+                print(f"[ERREUR] Bouton de connexion non trouve: {e}")
                 return False
 
         print("[ACTION] Tentative de connexion...")
@@ -406,14 +451,14 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
             driver.find_element(By.NAME, "code")
             print("[2FA] Champ de code 2FA détecté")
             return _gerer_2fa(driver, wait)
-        except ImportError:
+        except NoSuchElementException:
             pass
 
         try:
             driver.find_element(By.ID, "code")
             print("[2FA] Champ de code 2FA détecté (par ID)")
             return _gerer_2fa(driver, wait)
-        except ImportError:
+        except NoSuchElementException:
             pass
 
         # Vérifier par texte dans la page
@@ -425,8 +470,8 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
         print("[ERREUR] Echec de la connexion (toujours sur la page de login)")
         return False
 
-    except ImportError:
-        print("[ERREUR] Erreur lors de la connexion: ")
+    except Exception as e:
+        print(f"[ERREUR] Erreur lors de la connexion: {e}")
         traceback.print_exc()
         return False
 
