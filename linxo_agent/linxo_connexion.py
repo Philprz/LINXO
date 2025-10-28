@@ -263,45 +263,64 @@ def _gerer_2fa(driver, wait):
         print("[2FA] Code saisi")
         time.sleep(2)
 
-        # Chercher et cliquer sur le bouton de validation
-        submit_button = None
+        # ESSAYER D'ABORD AVEC LA TOUCHE ENTER (plus fiable)
+        print("[2FA] Tentative de validation avec la touche Enter...")
+        from selenium.webdriver.common.keys import Keys  # pylint: disable=import-outside-toplevel
+        code_field.send_keys(Keys.RETURN)
+        time.sleep(3)  # Attendre un peu pour voir si ça marche
 
-        print("[2FA] Recherche du bouton de validation...")
+        # Vérifier si on est toujours sur la page 2FA
+        current_url_after_enter = driver.current_url.lower()
+        if 'login' not in current_url_after_enter and 'auth' not in current_url_after_enter:
+            print("[2FA] Validation réussie avec Enter!")
+            print(f"[2FA] URL après validation: {driver.current_url}")
+            print("[SUCCESS] Connexion réussie après 2FA!")
+            return True
+
+        # Si Enter n'a pas marché, chercher le bouton
+        print("[2FA] Enter n'a pas fonctionné, recherche du bouton...")
+        submit_button = None
 
         # Méthode 1: Par texte "Valider", "Confirmer", "Vérifier"
         for button_text in ["Valider", "Confirmer", "Vérifier", "Envoyer", "Continuer"]:
             try:
-                submit_button = driver.find_element(
-                    By.XPATH,
-                    f"//button[contains(text(), '{button_text}')]"
+                # Attendre que le bouton soit cliquable
+                submit_button = wait.until(
+                    EC.element_to_be_clickable((
+                        By.XPATH,
+                        f"//button[contains(text(), '{button_text}')]"
+                    ))
                 )
-                print(f"[2FA] Bouton '{button_text}' trouvé")
+                print(f"[2FA] Bouton '{button_text}' trouvé et cliquable")
                 break
-            except NoSuchElementException:
+            except (TimeoutException, NoSuchElementException):
                 pass
 
-        # Méthode 2: Par type submit
+        # Méthode 2: Par type submit avec attente
         if not submit_button:
             try:
-                submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-                print("[2FA] Bouton submit trouvé")
-            except NoSuchElementException:
+                submit_button = wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']"))
+                )
+                print("[2FA] Bouton submit trouvé et cliquable")
+            except (TimeoutException, NoSuchElementException):
                 pass
 
-        # Méthode 3: N'importe quel bouton
+        # Méthode 3: N'importe quel bouton avec attente
         if not submit_button:
             try:
-                submit_button = driver.find_element(By.TAG_NAME, "button")
-                print("[2FA] Bouton générique trouvé")
-            except NoSuchElementException:
+                submit_button = wait.until(
+                    EC.element_to_be_clickable((By.TAG_NAME, "button"))
+                )
+                print("[2FA] Bouton générique trouvé et cliquable")
+            except (TimeoutException, NoSuchElementException):
                 pass
 
         if not submit_button:
-            print("[WARNING] Bouton de validation 2FA introuvable, tentative Enter")
-            # Essayer d'envoyer avec la touche Enter
-            from selenium.webdriver.common.keys import Keys  # pylint: disable=import-outside-toplevel
-            code_field.send_keys(Keys.RETURN)
+            print("[WARNING] Aucun bouton cliquable trouvé")
+            # On a déjà essayé Enter plus haut, donc rien de plus à faire
         else:
+            # Cliquer sur le bouton
             submit_button.click()
             print("[2FA] Bouton de validation cliqué")
 
