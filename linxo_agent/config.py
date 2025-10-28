@@ -43,16 +43,26 @@ class Config:
     def _setup_paths(self):
         """Configure les chemins selon l'environnement (Windows/Linux)"""
 
-        if self.is_linux and os.path.exists('/home/ubuntu'):
+        if self.is_linux and (os.path.exists('/home/ubuntu') or os.path.exists('/home/linxo/LINXO')):
             # Environnement VPS (production)
             self.env_name = "VPS"
-            self.base_dir = Path('/home/ubuntu')
-            self.linxo_agent_dir = self.base_dir / 'linxo_agent'
+
+            # Déterminer le bon répertoire de base
+            if os.path.exists('/home/linxo/LINXO'):
+                # Nouvelle structure avec utilisateur linxo
+                self.base_dir = Path('/home/linxo/LINXO')
+                self.linxo_agent_dir = self.base_dir / 'linxo_agent'
+                self.api_secrets_file = Path('/home/linxo/.api_secret_infos') / 'api_secrets.json'
+            else:
+                # Ancienne structure avec utilisateur ubuntu
+                self.base_dir = Path('/home/ubuntu')
+                self.linxo_agent_dir = self.base_dir / 'linxo_agent'
+                self.api_secrets_file = self.base_dir / '.api_secret_infos' / 'api_secrets.json'
+
             self.data_dir = self.base_dir / 'data'
             self.downloads_dir = self.base_dir / 'Downloads'
             self.logs_dir = self.base_dir / 'logs'
             self.reports_dir = self.base_dir / 'reports'
-            self.api_secrets_file = self.base_dir / '.api_secret_infos' / 'api_secrets.json'
         else:
             # Environnement local (développement)
             self.env_name = "LOCAL"

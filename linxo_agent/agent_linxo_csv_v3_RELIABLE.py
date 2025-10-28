@@ -8,17 +8,26 @@ Version 3.0 - RELIABLE - Corrigé selon l'analyse utilisateur d'octobre 2025
 import json
 import csv
 import re
+import sys
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import calendar
+from pathlib import Path
 
-# Configuration
-CONFIG_FILE = "/home/ubuntu/linxo_agent/config_linxo.json"
-DEPENSES_FILE = "/home/ubuntu/linxo_agent/depenses_recurrentes.json"
-CSV_FILE = "/home/ubuntu/data/latest.csv"  # Fichier CSV à analyser
-API_SECRETS_FILE = "/home/ubuntu/.api_secret_infos/api_secrets.json"
+# Importer le module de configuration
+sys.path.insert(0, str(Path(__file__).parent))
+from config import get_config
+
+# Charger la configuration
+_config = get_config()
+
+# Configuration - Utilise les chemins dynamiques du module config
+CONFIG_FILE = str(_config.config_linxo_file)
+DEPENSES_FILE = str(_config.depenses_file)
+CSV_FILE = str(_config.get_latest_csv())
+API_SECRETS_FILE = str(_config.api_secrets_file)
 
 # Seuils de tolérance
 SEUIL_SIMILARITE = 0.6  # 60% de similarité minimum pour matcher
@@ -605,7 +614,7 @@ def main():
     print("\n" + rapport)
     
     # Sauvegarder le rapport
-    rapport_file = f"/home/ubuntu/rapport_linxo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    rapport_file = _config.reports_dir / f"rapport_linxo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
     with open(rapport_file, 'w', encoding='utf-8') as f:
         f.write(rapport)
     print(f"\n💾 Rapport sauvegardé: {rapport_file}")
