@@ -129,22 +129,6 @@
       "categorie": "MAISON"
     },
     {
-      "libelle": "BLINK",
-      "compte": "hellobank",
-      "identifiant": "Alarme Vidéo",
-      "commentaire": "100 / An",
-      "montant": 8.33,
-      "categorie": "MAISON"
-    },
-    {
-      "libelle": "AMAZON PRIME FR PAYLI2469664/",
-      "compte": "hellobank",
-      "identifiant": "AMAZON PRIME",
-      "commentaire": "69,99 / an",
-      "montant": 5.83,
-      "categorie": "MAISON"
-    },
-    {
       "libelle": "Bouygues Telecom",
       "compte": "LCL",
       "identifiant": "Tel Cath",
@@ -177,59 +161,11 @@
       "categorie": "COMMUNICATION"
     },
     {
-      "libelle": "Microsoft",
-      "compte": "LCL",
-      "identifiant": "Office 365",
-      "commentaire": "99 / an",
-      "montant": 8.25,
-      "categorie": "COMMUNICATION"
-    },
-    {
-      "libelle": "PAYPAL *OVH LUXEMBOURG",
-      "compte": "LCL",
-      "identifiant": "OVH VPS",
-      "commentaire": "VPS Cloud 7.20",
-      "montant": 7.20,
-      "categorie": "MAISON"
-    },
-    {
-      "libelle": "PAYPAL *OVH LUXEMBOURG",
-      "compte": "LCL",
-      "identifiant": "OVH Domaine",
-      "commentaire": "Domaine 5.39",
-      "montant": 5.39,
-      "categorie": "MAISON"
-    },
-    {
-      "libelle": "PAYPAL *OVH LUXEMBOURG",
-      "compte": "LCL",
-      "identifiant": "OVH Email",
-      "commentaire": "Email Pro 2.39",
-      "montant": 2.39,
-      "categorie": "MAISON"
-    },
-    {
       "libelle": "PREDICA",
       "compte": "LCL",
       "identifiant": "ASSURANCE",
       "commentaire": "PREDICA",
       "montant": 45.0,
-      "categorie": "Assurances"
-    },
-    {
-      "libelle": "PREDICA",
-      "compte": "LCL",
-      "identifiant": "Assurance décès Phil",
-      "commentaire": "PREDICA (130,65 :TRIMESTRE)",
-      "montant": 32.66,
-      "categorie": "Assurances"
-    },
-    {
-      "libelle": "PREDICA",
-      "compte": "LCL",
-      "identifiant": "Assurance décès Cath",
-      "commentaire": "PREDICA (87,10 :TRIMESTRE)",
-      "montant": 21.77,
       "categorie": "Assurances"
     },
     {
@@ -321,7 +257,7 @@
       "categorie": "Epargne"
     }
   ],
-  "depenses_variables": [],
+  "depenses_variables": [1403],
   "revenus": [
     {
       "libelle": "SGC CALUIRE",
@@ -351,14 +287,14 @@
   "totaux": {
     "credits": 1046.0,
     "voiture": 716.0,
-    "maison": 577.7,
-    "communication": 50.22,
-    "assurances": 234.40000000000003,
+    "maison": 561,
+    "communication": 42,
+    "assurances": 180,
     "transport": 197.8,
     "impots": 0.0,
     "epargne": 600.0,
-    "total_depenses_fixes": 3422.12,
+    "total_depenses_fixes": 3343,
     "total_revenus": 4745.87,
-    "budget_variable_max": 1323.7316666666666
+    "budget_variable_max": 1400
   }
 }

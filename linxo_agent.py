@@ -14,6 +14,7 @@ Ce script orchestre l'ensemble du processus:
 import argparse
 import sys
 import traceback
+import shutil
 from csv import Error as CsvError
 from datetime import datetime
 from pathlib import Path
@@ -23,10 +24,10 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 
 # Imports des modules refactorisés
 from linxo_agent.config import get_config
-from linxo_agent.linxo_connexion import (
+from linxo_agent.linxo_driver_factory import (
     initialiser_driver_linxo,
     se_connecter_linxo,
-    telecharger_csv_linxo,
+    telecharger_csv_linxo
 )
 from linxo_agent.analyzer import analyser_csv
 from linxo_agent.notifications import NotificationManager
@@ -136,11 +137,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 # Cleanup du répertoire user-data temporaire
                 if user_data_dir and user_data_dir.exists():
                     try:
-                        import shutil
                         shutil.rmtree(user_data_dir, ignore_errors=True)
-                        print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
-                    except Exception as cleanup_error:
-                        print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+                        print(
+                            f"[CLEANUP] Repertoire temporaire supprime: "
+                            f"{user_data_dir.name}"
+                        )
+                    except (OSError, PermissionError) as cleanup_error:
+                        print(
+                            f"[WARN] Impossible de supprimer le "
+                            f"repertoire temporaire: {cleanup_error}"
+                        )
 
         else:
             if csv_file:
@@ -255,11 +261,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
         # Cleanup du répertoire user-data temporaire
         if user_data_dir and user_data_dir.exists():
             try:
-                import shutil
                 shutil.rmtree(user_data_dir, ignore_errors=True)
-                print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
-            except Exception as cleanup_error:
-                print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+                print(
+                    f"[CLEANUP] Repertoire temporaire supprime: "
+                    f"{user_data_dir.name}"
+                )
+            except (OSError, PermissionError) as cleanup_error:
+                print(
+                    f"[WARN] Impossible de supprimer le "
+                    f"repertoire temporaire: {cleanup_error}"
+                )
 
         return results
 
@@ -277,11 +288,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
         # Cleanup du répertoire user-data temporaire
         if user_data_dir and user_data_dir.exists():
             try:
-                import shutil
                 shutil.rmtree(user_data_dir, ignore_errors=True)
-                print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
-            except Exception as cleanup_error:
-                print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+                print(
+                    f"[CLEANUP] Repertoire temporaire supprime: "
+                    f"{user_data_dir.name}"
+                )
+            except (OSError, PermissionError) as cleanup_error:
+                print(
+                    f"[WARN] Impossible de supprimer le "
+                    f"repertoire temporaire: {cleanup_error}"
+                )
 
         return results
 
@@ -297,11 +313,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
         # Cleanup du répertoire user-data temporaire
         if user_data_dir and user_data_dir.exists():
             try:
-                import shutil
                 shutil.rmtree(user_data_dir, ignore_errors=True)
-                print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
-            except Exception as cleanup_error:
-                print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+                print(
+                    f"[CLEANUP] Repertoire temporaire supprime: "
+                    f"{user_data_dir.name}"
+                )
+            except (OSError, PermissionError) as cleanup_error:
+                print(
+                    f"[WARN] Impossible de supprimer le "
+                    f"repertoire temporaire: {cleanup_error}"
+                )
 
         return results
 
