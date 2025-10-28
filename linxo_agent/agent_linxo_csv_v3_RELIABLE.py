@@ -11,6 +11,7 @@ import csv
 import re
 import sys
 import os
+import io
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
@@ -212,7 +213,6 @@ def lire_csv_linxo(fichier_csv):
             delimiter = ';'
 
         # Lire le CSV depuis le contenu en mémoire
-        import io
         f = io.StringIO(content)
         reader = csv.DictReader(f, delimiter=delimiter)
 
