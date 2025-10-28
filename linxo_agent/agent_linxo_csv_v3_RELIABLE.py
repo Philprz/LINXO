@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=invalid-name
 """
 Agent Linxo - Analyse des dépenses à partir d'un export CSV
 Version 3.0 - RELIABLE - Corrigé selon l'analyse utilisateur d'octobre 2025
@@ -16,7 +17,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import calendar
 from pathlib import Path
-
+from difflib import SequenceMatcher
 # Détection automatique de l'environnement
 def _detect_base_dir():
     """Détecte le répertoire de base selon l'environnement"""
@@ -157,7 +158,6 @@ def normaliser_texte(texte):
 
 def calculer_similarite(texte1, texte2):
     """Calcule la similarité entre deux textes (0 à 1)"""
-    from difflib import SequenceMatcher
     texte1_norm = normaliser_texte(texte1)
     texte2_norm = normaliser_texte(texte2)
 
@@ -302,7 +302,8 @@ def identifier_depense_recurrente(transaction, depenses_recurrentes, depenses_de
 
 def analyser_transactions(transactions, data_depenses):
     """Analyse les transactions et les classe"""
-    depenses_recurrentes = data_depenses.get('depenses_fixes', data_depenses.get('depenses_recurrentes', []))
+    depenses_recurrentes = data_depenses.get('depenses_fixes',
+                                             data_depenses.get('depenses_recurrentes', []))
 
     depenses_fixes_identifiees = []
     depenses_variables = []
@@ -326,7 +327,8 @@ def analyser_transactions(transactions, data_depenses):
         )
 
         if depense_match:
-            nom_depense = depense_match.get('commentaire', depense_match.get('nom', depense_match.get('libelle', 'Inconnu')))
+            nom_depense = depense_match.get('commentaire',
+                depense_match.get('nom', depense_match.get('libelle', 'Inconnu')))
             transaction['depense_recurrente'] = nom_depense
             transaction['categorie_fixe'] = depense_match.get('categorie', 'Non classé')
             transaction['score_match'] = score
@@ -336,18 +338,24 @@ def analyser_transactions(transactions, data_depenses):
             if depense_id is not None:
                 depenses_deja_utilisees[depense_id] = depenses_deja_utilisees.get(depense_id, 0) + 1
 
-            print(f"✅ FIXE: {transaction['libelle'][:40]:40} | {montant:8.2f}€ | Match: {nom_depense[:30]} ({score:.0%})")
+            print(f"✅ FIXE: {transaction['libelle'][:40]:40} | {montant:8.2f}€ | "
+                f"Match: {nom_depense[:30]} ({score:.0%})")
+
         else:
             depenses_variables.append(transaction)
             total_depenses_variables += abs(montant)
 
-            print(f"💰 VAR:  {transaction['libelle'][:40]:40} | {montant:8.2f}€ | {transaction['categorie'][:20]}")
+            print(f"💰 VAR:  {transaction['libelle'][:40]:40} | "
+                  f"Match: {montant:8.2f}€ | {transaction['categorie'][:20]}")
 
     print("="*80)
     print("\n📊 RÉSUMÉ:")
-    print(f"   Dépenses fixes:     {len(depenses_fixes_identifiees):3} transactions | {total_depenses_fixes:10.2f}€")
-    print(f"   Dépenses variables: {len(depenses_variables):3} transactions | {total_depenses_variables:10.2f}€")
-    print(f"   TOTAL DÉPENSES:                              {total_depenses_fixes + total_depenses_variables:10.2f}€")
+    print(f"   Dépenses fixes:     {len(depenses_fixes_identifiees):3} transactions | "
+        f"{total_depenses_fixes:10.2f}€")
+    print(f"   Dépenses variables: {len(depenses_variables):3} transactions | "
+        f"{total_depenses_variables:10.2f}€")
+    print(f"   TOTAL DÉPENSES:                              "
+        f"{total_depenses_fixes + total_depenses_variables:10.2f}€")
 
     return {
         'depenses_fixes': depenses_fixes_identifiees,
@@ -415,28 +423,41 @@ def generer_conseil_budget(statut_info, depenses_variables, budget_max):
     if statut_info['alerte']:
         depassement = depenses_variables - budget_max
         conseils.append(f"⚠️ ALERTE BUDGET DÉPASSÉ DE {depassement:.2f}€ !")
-        conseils.append(f"Vous avez dépensé {statut_info['pourcentage_depense']:.0f}% de votre budget.")
+        conseils.append(
+            f"Vous avez dépensé {statut_info['pourcentage_depense']:.0f}% "
+            f"de votre budget."
+        )
         conseils.append(f"Il reste {jours_restants} jours dans le mois.")
         conseils.append("🚨 RECOMMANDATION : Limitez au maximum les dépenses non essentielles !")
 
     elif statut_info['emoji'] == "🟠":
         conseils.append("⚠️ Attention au rythme de dépenses !")
-        conseils.append(f"Vous avez dépensé {depenses_variables:.2f}€ sur {budget_max:.2f}€ ({statut_info['pourcentage_depense']:.0f}%).")
-        conseils.append(f"Nous sommes au jour {statut_info['jour_actuel']}/{statut_info['dernier_jour']} du mois ({statut_info['avancement_mois']:.0f}%).")
+        conseils.append(
+            f"Vous avez dépensé {depenses_variables:.2f}€ sur {budget_max:.2f}€ "
+            f"({statut_info['pourcentage_depense']:.0f}%).")
+        conseils.append(f"Nous sommes au jour {statut_info['jour_actuel']}/ "
+            f"{statut_info['dernier_jour']} du mois ({statut_info['avancement_mois']:.0f}%).")
 
         if statut_info['ecart'] > 0:
-            conseils.append(f"Vous êtes en avance de {abs(statut_info['ecart']):.2f}€ par rapport au rythme normal.")
+            conseils.append(
+                f"Vous êtes en avance de {abs(statut_info['ecart']):.2f}€ "
+                f"par rapport au rythme normal.")
 
-        conseils.append(f"💡 CONSEIL : Limitez-vous à {budget_jour:.2f}€/jour pour les {jours_restants} jours restants.")
+        conseils.append(
+            f"💡 CONSEIL : Limitez-vous à {budget_jour:.2f}€/jour "
+            f"pour les {jours_restants} jours restants.")
 
     else:
         conseils.append("✅ Budget sous contrôle !")
-        conseils.append(f"Dépenses : {depenses_variables:.2f}€ / {budget_max:.2f}€ ({statut_info['pourcentage_depense']:.0f}%).")
+        conseils.append(f"Dépenses : {depenses_variables:.2f}€ / "
+            f"{budget_max:.2f}€ ({statut_info['pourcentage_depense']:.0f}%).")
         conseils.append(f"Il vous reste {reste:.2f}€ pour {jours_restants} jours.")
         conseils.append(f"💡 Vous pouvez dépenser environ {budget_jour:.2f}€/jour.")
 
         if statut_info['ecart'] < -50:
-            conseils.append(f"👍 Excellent ! Vous êtes en avance de {abs(statut_info['ecart']):.2f}€ sur le budget prévu.")
+            conseils.append(
+                f"👍 Excellent ! Vous êtes en avance de {abs(statut_info['ecart']):.2f}€ "
+                f"sur le budget prévu.")
 
     return "\n".join(conseils)
 
@@ -458,7 +479,8 @@ def generer_rapport(analyse, data_depenses, transactions_exclues):
         rapport.append("-"*80)
         total_exclu = 0
         for trans in transactions_exclues:
-            rapport.append(f"   • {trans['libelle_complet'][:50]:50} | {trans['montant']:8.2f}€ | {trans['raison_exclusion']}")
+            rapport.append(f"   • {trans['libelle_complet'][:50]:50} | "
+                f"{trans['montant']:8.2f}€ | {trans['raison_exclusion']}")
             total_exclu += abs(trans['montant'])
         rapport.append(f"\n{'TOTAL EXCLU':50} | {total_exclu:8.2f}€")
         rapport.append("")
@@ -478,7 +500,9 @@ def generer_rapport(analyse, data_depenses, transactions_exclues):
         rapport.append(f"\n📁 {categorie}")
         total_cat = 0
         for dep in par_categorie[categorie]:
-            rapport.append(f"   • {dep['depense_recurrente']:35} | {dep['montant']:8.2f}€ | {dep['date_str']}")
+            rapport.append(
+                f"   • {dep['depense_recurrente']:35} | {dep['montant']:8.2f}€ | "
+                f"{dep['date_str']}")
             total_cat += abs(dep['montant'])
         rapport.append(f"   {'TOTAL ' + categorie:35} | {total_cat:8.2f}€")
 
@@ -500,7 +524,9 @@ def generer_rapport(analyse, data_depenses, transactions_exclues):
         rapport.append(f"\n📁 {categorie}")
         total_cat = 0
         for dep in par_categorie_var[categorie]:
-            rapport.append(f"   • {dep['libelle'][:35]:35} | {dep['montant']:8.2f}€ | {dep['date_str']}")
+            rapport.append(
+                f"   • {dep['libelle'][:35]:35} | {dep['montant']:8.2f}€ | "
+                f"{dep['date_str']}")
             total_cat += abs(dep['montant'])
         rapport.append(f"   {'TOTAL ' + categorie:35} | {total_cat:8.2f}€")
 
@@ -582,7 +608,11 @@ def envoyer_sms_ovh(destinataire, message):
             message = message[:157] + "..."
 
         # Format du sujet pour OVH: compte:utilisateur:password:expediteur:destinataire
-        sujet = f"{ovh_config['COMPTE_SMS']}:{ovh_config['UTILISATEUR_SMS']}:{ovh_config['MOT_DE_PASSE_SMS']}:{ovh_config['EXPEDITEUR_SMS']}:{destinataire}"
+        sujet = (
+            f"{ovh_config['COMPTE_SMS']}:{ovh_config['UTILISATEUR_SMS']}:"
+            f"{ovh_config['MOT_DE_PASSE_SMS']}:{ovh_config['EXPEDITEUR_SMS']}:"
+            f"{destinataire}"
+        )
 
         msg = MIMEMultipart()
         msg['Subject'] = sujet
@@ -666,15 +696,22 @@ def main():
             message += "⚠️ LIMITEZ VOS DÉPENSES!"
         elif statut_info['emoji'] == "🟠":
             message = "⚠️🟠 Attention Budget\n"
-            message += f"Dépensé: {depenses_var:.0f}€ / {budget_max:.0f}€ ({statut_info['pourcentage_depense']:.0f}%)\n"
+            message += (
+                f"Dépensé: {depenses_var:.0f}€ / {budget_max:.0f}€ "
+                f"({statut_info['pourcentage_depense']:.0f}%)\n"
+            )
             message += f"Reste: {reste:.0f}€\n"
             message += f"Jour {statut_info['jour_actuel']}/{statut_info['dernier_jour']} du mois"
         else:
             message = "✅🟢 Budget OK\n"
-            message += f"Dépensé: {depenses_var:.0f}€ / {budget_max:.0f}€ ({statut_info['pourcentage_depense']:.0f}%)\n"
+            message += (
+                f"Dépensé: {depenses_var:.0f}€ / {budget_max:.0f}€ "
+                f"({statut_info['pourcentage_depense']:.0f}%)\n"
+            )
             message += f"Reste: {reste:.0f}€\n"
-            message += f"Jour {statut_info['jour_actuel']}/{statut_info['dernier_jour']} - Tout va bien!"
-
+            message += (
+                f"Jour {statut_info['jour_actuel']}/{statut_info['dernier_jour']} - Tout va bien!"
+            )
         envoyer_sms_ovh(telephone, message)
 
     print("\n✅ Analyse terminée!")
