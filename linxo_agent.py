@@ -89,6 +89,7 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
     config.print_summary()
 
     driver = None
+    user_data_dir = None
     analysis_result = None
 
     try:
@@ -99,8 +100,8 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
             print("=" * 80)
 
             try:
-                # Initialiser le navigateur
-                driver, wait = initialiser_driver_linxo()
+                # Initialiser le navigateur (retourne maintenant driver, wait, user_data_dir)
+                driver, wait, user_data_dir = initialiser_driver_linxo()
 
                 # Se connecter à Linxo
                 connexion_ok = se_connecter_linxo(driver, wait)
@@ -131,6 +132,15 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                     with suppress(*QUIT_ERRORS):
                         driver.quit()
                     print("[INFO] Navigateur ferme")
+
+                # Cleanup du répertoire user-data temporaire
+                if user_data_dir and user_data_dir.exists():
+                    try:
+                        import shutil
+                        shutil.rmtree(user_data_dir, ignore_errors=True)
+                        print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
+                    except Exception as cleanup_error:
+                        print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
 
         else:
             if csv_file:
@@ -241,6 +251,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 print(f"[WARNING] Impossible de fermer le navigateur proprement: {quit_error}")
             except ImportError:
                 print("[WARNING] Erreur inattendue lors de la fermeture")
+
+        # Cleanup du répertoire user-data temporaire
+        if user_data_dir and user_data_dir.exists():
+            try:
+                import shutil
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+                print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
+            except Exception as cleanup_error:
+                print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+
         return results
 
     except GENERAL_WORKFLOW_ERRORS as error:
@@ -253,6 +273,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 print(f"[WARNING] Impossible de fermer le navigateur proprement: {quit_error}")
             except ImportError:
                 print("[WARNING] Erreur inattendue lors de la fermeture")
+
+        # Cleanup du répertoire user-data temporaire
+        if user_data_dir and user_data_dir.exists():
+            try:
+                import shutil
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+                print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
+            except Exception as cleanup_error:
+                print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+
         return results
 
     except ImportError:
@@ -263,6 +293,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 driver.quit()
             except ImportError:
                 print("[WARNING] Erreur lors de la fermeture")
+
+        # Cleanup du répertoire user-data temporaire
+        if user_data_dir and user_data_dir.exists():
+            try:
+                import shutil
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+                print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
+            except Exception as cleanup_error:
+                print(f"[WARN] Impossible de supprimer le repertoire temporaire: {cleanup_error}")
+
         return results
 
 

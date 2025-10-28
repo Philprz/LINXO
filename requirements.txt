@@ -20,3 +20,4 @@ requests==2.31.0
 
 # Additional utilities
 python-dotenv==1.0.0  # For environment variables management
+psutil>=5.9.0  # For process management and cleanup

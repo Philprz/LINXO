@@ -10,7 +10,11 @@ import platform
 import sys
 import time
 import traceback
+import signal
+import shutil
+import psutil
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -36,6 +40,129 @@ try:
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from linxo_2fa import recuperer_code_2fa_email  # type: ignore
+
+
+def _tuer_processus_chrome_zombies():
+    """
+    Tue tous les processus Chrome/ChromeDriver zombies ou orphelins
+    Utile pour nettoyer avant de démarrer une nouvelle session
+
+    Returns:
+        int: Nombre de processus tués
+    """
+    processus_tues = 0
+
+    try:
+        # Liste des processus à tuer
+        process_names = ['chrome', 'chromedriver', 'chromium']
+
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                proc_name = proc.info['name'].lower() if proc.info['name'] else ''
+                cmdline = proc.info['cmdline'] if proc.info['cmdline'] else []
+                cmdline_str = ' '.join(cmdline).lower()
+
+                # Vérifier si c'est un processus Chrome/ChromeDriver lié à notre projet
+                is_target = any(name in proc_name for name in process_names)
+                is_selenium = 'selenium' in cmdline_str or 'webdriver' in cmdline_str
+
+                if is_target and (is_selenium or '--remote-debugging-port=9222' in cmdline_str):
+                    print(f"[CLEANUP] Arret du processus zombie: {proc.info['name']} (PID: {proc.info['pid']})")
+                    proc.terminate()
+
+                    # Attendre 2 secondes pour la terminaison gracieuse
+                    try:
+                        proc.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        # Force kill si nécessaire
+                        proc.kill()
+
+                    processus_tues += 1
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                # Le processus a déjà disparu ou on n'a pas les droits
+                continue
+
+    except Exception as e:
+        print(f"[WARN] Erreur lors du nettoyage des processus: {e}")
+
+    if processus_tues > 0:
+        print(f"[CLEANUP] {processus_tues} processus Chrome/ChromeDriver arretes")
+        # Attendre un peu pour que les locks soient libérés
+        time.sleep(2)
+
+    return processus_tues
+
+
+def _nettoyer_anciens_user_data_dirs(base_dir, max_age_hours=24):
+    """
+    Nettoie les anciens répertoires user-data temporaires
+
+    Args:
+        base_dir: Répertoire de base contenant les répertoires temporaires
+        max_age_hours: Age maximum en heures avant suppression (défaut: 24h)
+
+    Returns:
+        int: Nombre de répertoires supprimés
+    """
+    repertoires_supprimes = 0
+
+    try:
+        base_path = Path(base_dir)
+        if not base_path.exists():
+            return 0
+
+        # Chercher tous les répertoires correspondant au pattern
+        pattern = '.chrome_user_data_*'
+        current_time = datetime.now()
+        max_age = timedelta(hours=max_age_hours)
+
+        for user_data_dir in base_path.glob(pattern):
+            if not user_data_dir.is_dir():
+                continue
+
+            try:
+                # Vérifier l'âge du répertoire
+                dir_mtime = datetime.fromtimestamp(user_data_dir.stat().st_mtime)
+                age = current_time - dir_mtime
+
+                if age > max_age:
+                    print(f"[CLEANUP] Suppression du repertoire ancien: {user_data_dir.name} (age: {age.total_seconds()/3600:.1f}h)")
+                    shutil.rmtree(user_data_dir, ignore_errors=True)
+                    repertoires_supprimes += 1
+
+            except (OSError, ValueError) as e:
+                print(f"[WARN] Impossible de supprimer {user_data_dir.name}: {e}")
+                continue
+
+    except Exception as e:
+        print(f"[WARN] Erreur lors du nettoyage des repertoires: {e}")
+
+    if repertoires_supprimes > 0:
+        print(f"[CLEANUP] {repertoires_supprimes} anciens repertoires supprimes")
+
+    return repertoires_supprimes
+
+
+def _creer_user_data_dir_unique(base_dir):
+    """
+    Crée un répertoire user-data-dir unique pour cette session
+
+    Args:
+        base_dir: Répertoire de base où créer le répertoire temporaire
+
+    Returns:
+        Path: Chemin du répertoire créé
+    """
+    # Format: .chrome_user_data_YYYYMMDD_HHMMSS_PID
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    pid = os.getpid()
+    user_data_dir = Path(base_dir) / f".chrome_user_data_{timestamp}_{pid}"
+
+    # Créer le répertoire
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    return user_data_dir
 
 
 def _gerer_2fa(driver, wait):
@@ -304,17 +431,23 @@ def se_connecter_linxo(driver, wait, email=None, password=None):
         return False
 
 
-def initialiser_driver_linxo(download_dir=None, headless=False):
+def initialiser_driver_linxo(download_dir=None, headless=False, cleanup=True, max_retries=3):
     """
     Initialise un driver Chrome configuré pour Linxo
-    Version 2.0 - Utilise la configuration unifiée
+    Version 3.0 - Avec gestion robuste des conflits et cleanup automatique
 
     Args:
         download_dir: Dossier de téléchargement (optionnel, utilise config par défaut)
         headless: Mode headless (sans interface graphique)
+        cleanup: Si True, nettoie les processus zombies et anciens répertoires (défaut: True)
+        max_retries: Nombre de tentatives en cas d'échec (défaut: 3)
 
     Returns:
-        tuple: (driver, wait)
+        tuple: (driver, wait, user_data_dir)
+              Le user_data_dir est retourné pour permettre le cleanup après utilisation
+
+    Raises:
+        WebDriverException: Si l'initialisation échoue après toutes les tentatives
     """
     print("[INIT] Initialisation du navigateur...")
 
@@ -329,53 +462,110 @@ def initialiser_driver_linxo(download_dir=None, headless=False):
     download_dir = Path(download_dir)
     download_dir.mkdir(parents=True, exist_ok=True)
 
-    # Créer un répertoire user-data unique pour éviter les conflits
-    user_data_dir = config.base_dir / ".chrome_user_data"
-    user_data_dir.mkdir(parents=True, exist_ok=True)
+    # ÉTAPE 1: Cleanup préventif (si activé)
+    if cleanup:
+        print("\n[CLEANUP] Nettoyage preventif...")
+        _tuer_processus_chrome_zombies()
+        _nettoyer_anciens_user_data_dirs(config.base_dir, max_age_hours=24)
+        print("[CLEANUP] Nettoyage termine\n")
 
-    options = Options()
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-software-rasterizer')
-    options.add_argument(f'--user-data-dir={user_data_dir}')
-    options.add_argument('--remote-debugging-port=9222')
+    # ÉTAPE 2: Tentatives d'initialisation avec retry
+    last_exception = None
+    user_data_dir = None
 
-    # Détection automatique du mode headless pour VPS/serveurs
-    is_server = (
-        os.environ.get('DISPLAY') is None or  # Pas d'affichage X
-        'microsoft' in platform.uname().release.lower() or  # WSL
-        headless  # Explicitement demandé
-    )
+    for tentative in range(1, max_retries + 1):
+        try:
+            print(f"[INIT] Tentative {tentative}/{max_retries}...")
 
-    if is_server:
-        options.add_argument('--headless=new')
-        print("[INFO] Mode headless active (environnement serveur detecte)")
+            # Créer un répertoire user-data UNIQUE pour cette session
+            user_data_dir = _creer_user_data_dir_unique(config.base_dir)
 
-    # Configuration des téléchargements
-    prefs = {
-        "download.default_directory": str(download_dir.absolute()),
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": True
-    }
-    options.add_experimental_option("prefs", prefs)
+            options = Options()
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--window-size=1920,1080')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-software-rasterizer')
+            options.add_argument(f'--user-data-dir={user_data_dir}')
 
-    print(f"[INFO] Dossier de telechargement: {download_dir}")
-    print(f"[INFO] Dossier user-data: {user_data_dir}")
+            # Port de debugging unique basé sur le PID pour éviter les conflits
+            debug_port = 9222 + (os.getpid() % 1000)
+            options.add_argument(f'--remote-debugging-port={debug_port}')
 
-    try:
-        driver = webdriver.Chrome(options=options)
-        wait = WebDriverWait(driver, 30)
-        print("[OK] Navigateur initialise")
+            # Détection automatique du mode headless pour VPS/serveurs
+            is_server = (
+                os.environ.get('DISPLAY') is None or  # Pas d'affichage X
+                'microsoft' in platform.uname().release.lower() or  # WSL
+                headless  # Explicitement demandé
+            )
 
-        return driver, wait
+            if is_server:
+                options.add_argument('--headless=new')
+                print("[INFO] Mode headless active (environnement serveur detecte)")
 
-    except ImportError:
-        print("[ERREUR] Impossible d'initialiser le navigateur: ")
-        print("[INFO] Verifiez que Chrome et ChromeDriver sont installes")
-        raise
+            # Configuration des téléchargements
+            prefs = {
+                "download.default_directory": str(download_dir.absolute()),
+                "download.prompt_for_download": False,
+                "download.directory_upgrade": True,
+                "safebrowsing.enabled": True
+            }
+            options.add_experimental_option("prefs", prefs)
+
+            print(f"[INFO] Dossier de telechargement: {download_dir}")
+            print(f"[INFO] Dossier user-data: {user_data_dir}")
+            print(f"[INFO] Port de debugging: {debug_port}")
+
+            # Tentative de création du driver
+            driver = webdriver.Chrome(options=options)
+            wait = WebDriverWait(driver, 30)
+            print("[OK] Navigateur initialise avec succes!")
+
+            # Retourner le driver, wait ET le user_data_dir pour cleanup ultérieur
+            return driver, wait, user_data_dir
+
+        except WebDriverException as e:
+            last_exception = e
+            error_msg = str(e)
+
+            print(f"[ERREUR] Tentative {tentative} echouee: {error_msg[:200]}")
+
+            # Cleanup du répertoire créé pour cette tentative
+            if user_data_dir is not None:
+                try:
+                    if user_data_dir.exists():
+                        shutil.rmtree(user_data_dir, ignore_errors=True)
+                        print(f"[CLEANUP] Repertoire temporaire supprime: {user_data_dir.name}")
+                except Exception as cleanup_error:
+                    print(f"[WARN] Impossible de supprimer {user_data_dir.name}: {cleanup_error}")
+
+            # Si c'est un problème de user-data-dir et qu'il reste des tentatives
+            if 'user data directory' in error_msg.lower() and tentative < max_retries:
+                print("[RETRY] Nouveau nettoyage des processus et nouvelle tentative...")
+                _tuer_processus_chrome_zombies()
+                time.sleep(3)  # Attendre que les locks soient libérés
+                continue
+
+            # Si c'est la dernière tentative, lever l'exception
+            if tentative == max_retries:
+                print(f"\n[ERREUR FATALE] Impossible d'initialiser le navigateur apres {max_retries} tentatives")
+                print("[INFO] Verifiez que Chrome et ChromeDriver sont installes")
+                print("[INFO] Verifiez qu'aucune autre instance n'est en cours d'execution")
+                raise
+
+            # Attendre un peu avant la prochaine tentative
+            time.sleep(2)
+
+        except Exception as e:
+            # Erreur inattendue
+            print(f"[ERREUR] Erreur inattendue lors de l'initialisation: {e}")
+            traceback.print_exc()
+            raise
+
+    # Cette ligne ne devrait jamais être atteinte, mais au cas où
+    if last_exception:
+        raise last_exception
+    raise RuntimeError("Echec de l'initialisation du navigateur")
 
 
 def telecharger_csv_linxo(driver, wait):
@@ -513,9 +703,10 @@ if __name__ == "__main__":
 
     # pylint: disable=invalid-name
     test_driver = None
+    test_user_data_dir = None
     try:
-        # Initialiser le driver
-        test_driver, test_wait = initialiser_driver_linxo()
+        # Initialiser le driver (retourne maintenant driver, wait, user_data_dir)
+        test_driver, test_wait, test_user_data_dir = initialiser_driver_linxo()
 
         # Se connecter
         success = se_connecter_linxo(test_driver, test_wait)
@@ -538,6 +729,11 @@ if __name__ == "__main__":
         input("\nAppuyez sur Entree pour fermer le navigateur...")
         test_driver.quit()
 
+        # Cleanup du répertoire temporaire
+        if test_user_data_dir and test_user_data_dir.exists():
+            shutil.rmtree(test_user_data_dir, ignore_errors=True)
+            print(f"[CLEANUP] Repertoire temporaire supprime: {test_user_data_dir.name}")
+
     except KeyboardInterrupt:
         print("\n[INFO] Test interrompu par l'utilisateur")
         if test_driver:
@@ -545,6 +741,17 @@ if __name__ == "__main__":
                 test_driver.quit()
             except WebDriverException:
                 pass
+
+        # Cleanup du répertoire temporaire
+        if test_user_data_dir and test_user_data_dir.exists():
+            shutil.rmtree(test_user_data_dir, ignore_errors=True)
+            print(f"[CLEANUP] Repertoire temporaire supprime: {test_user_data_dir.name}")
+
     except WebDriverException as e:
         print(f"\n[ERREUR] Erreur durant le test: {e}")
         traceback.print_exc()
+
+        # Cleanup du répertoire temporaire
+        if test_user_data_dir and test_user_data_dir.exists():
+            shutil.rmtree(test_user_data_dir, ignore_errors=True)
+            print(f"[CLEANUP] Repertoire temporaire supprime: {test_user_data_dir.name}")
