@@ -52,7 +52,7 @@ class Config:
                 # Nouvelle structure avec utilisateur linxo
                 self.base_dir = Path('/home/linxo/LINXO')
                 self.linxo_agent_dir = self.base_dir / 'linxo_agent'
-                self.api_secrets_file = Path('/home/linxo/.api_secret_infos') / 'api_secrets.json'
+                self.api_secrets_file = Path('/home/linxo/LINXO/') / 'api_secrets.json'
             else:
                 # Ancienne structure avec utilisateur ubuntu
                 self.base_dir = Path('/home/ubuntu')
