@@ -1,0 +1,55 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Rapport Linxo - {{ report_date }}{% endblock %}
+
+{% block header_title %}Rapport Budget du {{ report_date }}{% endblock %}
+{% block header_subtitle %}Vue d'ensemble par famille de dépenses{% endblock %}
+
+{% block content %}
+<div class="summary-card">
+    <div class="summary-item">
+        <span class="summary-label">Total des dépenses</span>
+        <span class="summary-value">{{ "%.2f"|format(grand_total) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Nombre de transactions</span>
+        <span class="summary-value">{{ total_transactions }}</span>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Dépenses par famille</h2>
+    <p class="section-description">Cliquez sur une famille pour voir le détail des transactions</p>
+
+    <table class="families-table">
+        <thead>
+            <tr>
+                <th>Famille</th>
+                <th class="text-center">Transactions</th>
+                <th class="text-right">Montant</th>
+                <th class="text-center">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for family in families %}
+            <tr>
+                <td class="family-name">{{ family.name }}</td>
+                <td class="text-center">{{ family.count }}</td>
+                <td class="text-right amount-cell">{{ "%.2f"|format(family.total) }} €</td>
+                <td class="text-center">
+                    <a href="{{ family.url }}" class="btn-detail">Voir le détail →</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td><strong>TOTAL</strong></td>
+                <td class="text-center"><strong>{{ total_transactions }}</strong></td>
+                <td class="text-right"><strong>{{ "%.2f"|format(grand_total) }} €</strong></td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

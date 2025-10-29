@@ -1,0 +1,130 @@
+{% extends "base.html.j2" %}
+
+{% block title %}{{ famille_name }} - Rapport Linxo{% endblock %}
+
+{% block header_title %}{{ famille_name }}{% endblock %}
+{% block header_subtitle %}Rapport du {{ report_date }}{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb">
+    <a href="{{ index_url }}">← Retour à l'index</a>
+</nav>
+
+<div class="summary-card">
+    <div class="summary-item">
+        <span class="summary-label">Total {{ famille_name }}</span>
+        <span class="summary-value">{{ "%.2f"|format(total) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Nombre de transactions</span>
+        <span class="summary-value">{{ count }}</span>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Détail des transactions</h2>
+    <p class="section-description">Transactions triées par date (plus récentes en premier)</p>
+
+    <table class="transactions-table" id="transactions-table">
+        <thead>
+            <tr>
+                <th class="sortable" data-sort="date">Date <span class="sort-icon">▼</span></th>
+                <th class="sortable" data-sort="categorie">Catégorie <span class="sort-icon"></span></th>
+                <th class="sortable" data-sort="libelle">Libellé <span class="sort-icon"></span></th>
+                <th class="sortable text-right" data-sort="montant">Montant <span class="sort-icon"></span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for transaction in transactions %}
+            <tr>
+                <td class="date-cell" data-date="{{ transaction.date }}">{{ transaction.date }}</td>
+                <td class="categorie-cell">{{ transaction.categorie }}</td>
+                <td class="libelle-cell">{{ transaction.libelle }}</td>
+                <td class="amount-cell text-right" data-amount="{{ transaction.montant }}">{{ "%.2f"|format(transaction.montant) }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="3"><strong>TOTAL {{ famille_name }}</strong></td>
+                <td class="text-right"><strong>{{ "%.2f"|format(total) }} €</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<script>
+// Script de tri de table côté client (léger et simple)
+(function() {
+    const table = document.getElementById('transactions-table');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.sortable');
+    let currentSort = { column: 'date', order: 'desc' };
+
+    function parseDate(dateStr) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+        return new Date(0);
+    }
+
+    function sortTable(column, order) {
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+            let aVal, bVal;
+
+            if (column === 'date') {
+                aVal = parseDate(a.querySelector('.date-cell').dataset.date || a.querySelector('.date-cell').textContent);
+                bVal = parseDate(b.querySelector('.date-cell').dataset.date || b.querySelector('.date-cell').textContent);
+            } else if (column === 'montant') {
+                aVal = parseFloat(a.querySelector('.amount-cell').dataset.amount || 0);
+                bVal = parseFloat(b.querySelector('.amount-cell').dataset.amount || 0);
+            } else if (column === 'categorie') {
+                aVal = a.querySelector('.categorie-cell').textContent.toLowerCase();
+                bVal = b.querySelector('.categorie-cell').textContent.toLowerCase();
+            } else if (column === 'libelle') {
+                aVal = a.querySelector('.libelle-cell').textContent.toLowerCase();
+                bVal = b.querySelector('.libelle-cell').textContent.toLowerCase();
+            }
+
+            if (aVal < bVal) return order === 'asc' ? -1 : 1;
+            if (aVal > bVal) return order === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+
+        // Mettre à jour les icônes de tri
+        headers.forEach(header => {
+            const icon = header.querySelector('.sort-icon');
+            if (header.dataset.sort === column) {
+                icon.textContent = order === 'asc' ? '▲' : '▼';
+            } else {
+                icon.textContent = '';
+            }
+        });
+    }
+
+    headers.forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            let order = 'asc';
+
+            if (currentSort.column === column) {
+                order = currentSort.order === 'asc' ? 'desc' : 'asc';
+            }
+
+            currentSort = { column, order };
+            sortTable(column, order);
+        });
+    });
+
+    // Tri initial par date décroissante
+    sortTable('date', 'desc');
+})();
+</script>
+{% endblock %}

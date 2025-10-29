@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Rapport Linxo{% endblock %}</title>
+    <link rel="stylesheet" href="/static/reports/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>💰 {% block header_title %}Rapport Linxo{% endblock %}</h1>
+            <p class="subtitle">{% block header_subtitle %}{% endblock %}</p>
+        </header>
+
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <p>🤖 Rapport généré automatiquement par votre Agent Linxo</p>
+        </footer>
+    </div>
+</body>
+</html>
