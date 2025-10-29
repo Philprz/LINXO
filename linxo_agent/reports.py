@@ -90,29 +90,129 @@ def classify_famille(categorie: str, libelle: str) -> str:
     categorie_upper = categorie.upper()
     libelle_upper = libelle.upper()
 
-    # Mapping des catégories vers les familles
-    if 'ALIMENTATION' in categorie_upper or 'SUPERMARCHE' in categorie_upper:
+    # Mapping des catégories vers les familles (ordre d'importance)
+
+    # Crédits & Emprunts
+    if ('PRET' in categorie_upper or 'CREDIT' in categorie_upper or
+        'SOFINCO' in categorie_upper or 'DIAC' in libelle_upper or
+        'ONEY' in libelle_upper or 'CONSUMER FINANCE' in libelle_upper or
+        'ECHEANCE PRET' in libelle_upper):
+        return 'Crédits & Emprunts'
+
+    # Épargne & Investissements
+    elif ('EPARGNE' in categorie_upper or 'GENERALI' in libelle_upper or
+          'BITCOIN' in categorie_upper or 'BITSTACK' in libelle_upper or
+          'CRYPTO' in categorie_upper):
+        return 'Épargne & Investissements'
+
+    # Animaux
+    elif ('ANIMAUX' in categorie_upper or 'VETERINAIRE' in categorie_upper or
+          'VETERI' in libelle_upper or 'GAMM VERT' in libelle_upper):
+        return 'Animaux de compagnie'
+
+    # Énergie & Eau (distinct de Logement)
+    elif ('ELECTRICITE' in categorie_upper or 'GAZ' in categorie_upper or
+          'CHAUFFAGE' in categorie_upper or 'EAU' in categorie_upper or
+          'ENGIE' in libelle_upper or 'EDF' in libelle_upper or 'SGC' in libelle_upper):
+        return 'Énergie & Eau'
+
+    # Télécommunications
+    elif ('INTERNET' in categorie_upper or 'TELECOM' in categorie_upper or
+          'FREE' in libelle_upper or 'BOUYGUES' in libelle_upper or
+          'ORANGE' in libelle_upper or 'SFR' in libelle_upper or
+          'DISNEY' in libelle_upper):
+        return 'Télécommunications'
+
+    # Impôts & Taxes
+    elif ('IMPOT' in categorie_upper or 'TAXE' in categorie_upper or
+          'DIRECTION GENERALE' in libelle_upper or 'TRESOR PUBLIC' in libelle_upper):
+        return 'Impôts & Taxes'
+
+    # Beauté & Bien-être
+    elif ('COIFFEUR' in categorie_upper or 'ESTHETIQUE' in categorie_upper or
+          'COSMETIQUE' in categorie_upper or 'SOINS' in categorie_upper or
+          'BEAUTE' in categorie_upper):
+        return 'Beauté & Bien-être'
+
+    # Travaux & Jardin
+    elif ('TRAVAUX' in categorie_upper or 'DECO' in categorie_upper or
+          'JARDIN' in categorie_upper or 'LEROY MERLIN' in libelle_upper or
+          'BRICOLAGE' in categorie_upper):
+        return 'Maison & Jardin'
+
+    # Services (PayPal, OVH, etc.)
+    elif ('SERVICES' in categorie_upper or 'OVH' in libelle_upper or
+          'SENDINB' in libelle_upper or 'UBER' in libelle_upper):
+        return 'Services & Tech'
+
+    # Parking & Péages
+    elif ('PARKING' in categorie_upper or 'PEAGE' in categorie_upper or
+          'APRR' in libelle_upper or 'LPA' in libelle_upper or 'GARAGE' in categorie_upper):
+        return 'Parking & Péages'
+
+    # Snacks & Café au travail
+    elif ('SNACKS' in categorie_upper or 'REPAS AU TRAVAIL' in categorie_upper or
+          'MAXICOFFEE' in libelle_upper):
+        return 'Café & Snacks'
+
+    # Culture & Divertissement
+    elif ('MUSIQUE' in categorie_upper or 'LIVRES' in categorie_upper or
+          'FILMS' in categorie_upper or 'FNAC' in libelle_upper or
+          'ELECTRONIQUE' in categorie_upper or 'MULTIMEDIA' in categorie_upper or
+          'CDISCOUNT' in libelle_upper):
+        return 'Culture & High-tech'
+
+    # Restauration scolaire
+    elif ('RESTAURATION SCOLAIRE' in categorie_upper or 'CANTINE' in categorie_upper):
+        return 'Éducation & Enfants'
+
+    # Frais juridiques & syndicaux
+    elif ('CONSEIL JURIDIQUE' in categorie_upper or 'CFDT' in libelle_upper or
+          'SYNDICAT' in categorie_upper):
+        return 'Juridique & Syndical'
+
+    # Intérêts & Frais bancaires
+    elif ('INTERET' in categorie_upper or 'FRAIS' in categorie_upper or
+          'BANQUE' in categorie_upper or 'AGIOS' in categorie_upper):
+        return 'Frais bancaires'
+
+    # Alimentation
+    elif 'ALIMENTATION' in categorie_upper or 'SUPERMARCHE' in categorie_upper:
         return 'Alimentation'
+
+    # Restaurants & Cafés
     elif 'RESTAURANT' in categorie_upper or 'CAFE' in categorie_upper:
         return 'Restaurants & Cafés'
+
+    # Transports
     elif 'TRANSPORT' in categorie_upper or 'CARBURANT' in categorie_upper or 'ESSENCE' in categorie_upper:
         return 'Transports'
-    elif 'LOGEMENT' in categorie_upper or 'LOYER' in categorie_upper or 'EDF' in libelle_upper or 'GAZ' in libelle_upper:
-        return 'Logement & Énergie'
+
+    # Logement (uniquement loyer maintenant)
+    elif 'LOGEMENT' in categorie_upper or 'LOYER' in categorie_upper:
+        return 'Logement'
+
+    # Santé
     elif 'SANTE' in categorie_upper or 'PHARMACIE' in categorie_upper or 'MEDECIN' in categorie_upper:
         return 'Santé'
+
+    # Loisirs & Sports
     elif 'LOISIR' in categorie_upper or 'SPORT' in categorie_upper or 'CINEMA' in categorie_upper:
         return 'Loisirs & Sports'
+
+    # Shopping & Mode
     elif 'SHOPPING' in categorie_upper or 'VETEMENT' in categorie_upper or 'HABILLEMENT' in categorie_upper:
         return 'Shopping & Mode'
+
+    # Abonnements
     elif 'ABONNEMENT' in categorie_upper or 'NETFLIX' in libelle_upper or 'SPOTIFY' in libelle_upper:
         return 'Abonnements'
-    elif 'BANQUE' in categorie_upper or 'FRAIS' in categorie_upper:
-        return 'Frais bancaires'
+
+    # Assurances
     elif 'ASSURANCE' in categorie_upper:
         return 'Assurances'
-    elif 'IMPOT' in categorie_upper or 'TAXE' in categorie_upper:
-        return 'Impôts & Taxes'
+
+    # Tout le reste
     else:
         return 'Autres dépenses'
 
