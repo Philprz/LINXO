@@ -170,7 +170,7 @@
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">{{ "Dépassement" if reste < 0 else "Reste disponible" }}</span>
-                    <span class="summary-value" style="color: {{ '#dc3545' if reste < 0 else '#28a745' }};">{{ "%.2f"|format(abs(reste)) }} €</span>
+                    <span class="summary-value" style="color: {{ '#dc3545' if reste < 0 else '#28a745' }};">{{ "%.2f"|format(reste if reste >= 0 else -reste) }} €</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">Utilisation du budget</span>
