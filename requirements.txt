@@ -13,11 +13,22 @@ requests==2.31.0
 # smtplib - built-in
 # email - built-in
 
-# Data handling (built-in)
+# Data handling
+pandas>=2.0.0  # For DataFrame operations in reports
 # json - built-in
 # csv - built-in
 # datetime - built-in
 # pathlib - built-in
+
+# Web Framework & Server
+fastapi>=0.104.0  # For report server
+uvicorn[standard]>=0.24.0  # ASGI server for FastAPI
+python-multipart>=0.0.6  # For file uploads (FastAPI dependency)
+
+# Templates & Security
+jinja2>=3.1.0  # For HTML template rendering
+itsdangerous>=2.1.0  # For HMAC token signing
+bcrypt>=4.0.0  # For password hashing (optional, used for constant-time compare)
 
 # Additional utilities
 python-dotenv==1.0.0  # For environment variables management

@@ -41,6 +41,7 @@ geckodriver*
 
 # Data files
 data/
+!data/reports/.gitkeep
 downloads/
 Uploads/
 Downloads/
@@ -51,6 +52,10 @@ reports/
 *.txt
 !requirements.txt
 !post-cleanup-checklist.txt
+
+# Templates et static (à versionner)
+!templates/
+!static/
 
 # Backups
 BACKUP*/

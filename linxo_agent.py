@@ -191,6 +191,70 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
             traceback.print_exc()
             return results
 
+        # ÉTAPE 2.5: Génération des rapports HTML
+        print("\n" + "=" * 80)
+        print("ETAPE 2.5: GENERATION DES RAPPORTS HTML")
+        print("=" * 80)
+
+        report_index = None
+        try:
+            import pandas as pd
+            import os
+            from linxo_agent.reports import build_daily_report
+
+            # Vérifier que REPORTS_BASE_URL est configuré
+            base_url = os.getenv('REPORTS_BASE_URL')
+            if not base_url:
+                print("[WARNING] REPORTS_BASE_URL non configure, rapports HTML desactives")
+                print("[INFO] Definissez REPORTS_BASE_URL dans .env pour activer les rapports")
+            else:
+                # Convertir les données en DataFrame
+                all_transactions = (
+                    analysis_result.get('depenses_fixes', []) +
+                    analysis_result.get('depenses_variables', [])
+                )
+
+                if all_transactions:
+                    # Créer le DataFrame
+                    df_data = []
+                    for trans in all_transactions:
+                        df_data.append({
+                            'date': trans.get('date_str', ''),
+                            'libelle': trans.get('libelle', ''),
+                            'montant': trans.get('montant', 0),
+                            'categorie': trans.get('categorie', 'Non classé'),
+                            'date_str': trans.get('date_str', '')
+                        })
+
+                    df = pd.DataFrame(df_data)
+
+                    # Générer les rapports
+                    signing_key = os.getenv('REPORTS_SIGNING_KEY')
+                    report_index = build_daily_report(
+                        df,
+                        report_date=None,  # Aujourd'hui par défaut
+                        base_url=base_url,
+                        signing_key=signing_key
+                    )
+
+                    print(f"[SUCCESS] Rapports HTML generes dans {report_index.base_dir}")
+                    print(f"  - {len(report_index.families)} familles de depenses")
+                    print(f"  - Total: {report_index.grand_total:.2f}E")
+                else:
+                    print("[WARNING] Aucune transaction a reporter")
+
+        except ValueError as ve:
+            # Erreur de configuration (REPORTS_BASE_URL manquant)
+            print(f"[WARNING] {ve}")
+            print("[INFO] Les notifications utiliseront le format classique")
+        except ImportError as ie:
+            print(f"[WARNING] Impossible de generer les rapports HTML: {ie}")
+            print("[INFO] Installez les dependances: pip install pandas jinja2")
+        except Exception as e:
+            print(f"[WARNING] Erreur lors de la generation des rapports HTML: {e}")
+            print("[INFO] Les notifications utiliseront le format classique")
+            traceback.print_exc()
+
         # ÉTAPE 3: Envoi des notifications
         if not skip_notifications:
             print("\n" + "=" * 80)
@@ -199,7 +263,10 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
 
             try:
                 notification_manager = NotificationManager()
-                notif_results = notification_manager.send_budget_notification(analysis_result)
+                notif_results = notification_manager.send_budget_notification(
+                    analysis_result,
+                    report_index=report_index
+                )
 
                 # Vérifier les résultats
                 sms_results = notif_results.get('sms', {})

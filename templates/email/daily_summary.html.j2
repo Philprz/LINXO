@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.4;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background-color: white;
+        }
+        .header {
+            background: linear-gradient(135deg, #7c69ef 0%, #a78bfa 100%);
+            color: white;
+            padding: 35px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .header .date {
+            font-size: 15px;
+            opacity: 0.95;
+        }
+        .content {
+            padding: 25px 30px;
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid #dee2e6;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+        .summary-label {
+            font-size: 15px;
+            color: #495057;
+        }
+        .summary-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #7c69ef;
+        }
+        .families-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .families-table th {
+            background-color: #f8f9fa;
+            padding: 12px 10px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .families-table td {
+            padding: 12px 10px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .families-table tr:hover {
+            background-color: #fafafa;
+        }
+        .family-name {
+            font-weight: 600;
+            color: #333;
+        }
+        .amount-cell {
+            color: #dc3545;
+            font-weight: 700;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .link-cell {
+            text-align: center;
+        }
+        .btn-detail {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #7c69ef;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .btn-detail:hover {
+            background-color: #5a4bbd;
+        }
+        .total-row {
+            background-color: #f8f9fa;
+            font-weight: 700;
+            border-top: 2px solid #dee2e6;
+        }
+        .cta-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 25px;
+            background-color: #fff9e6;
+            border-radius: 8px;
+            border: 2px solid #ffc107;
+        }
+        .cta-section p {
+            font-size: 15px;
+            color: #856404;
+            margin-bottom: 15px;
+        }
+        .btn-primary {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #7c69ef;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        .btn-primary:hover {
+            background-color: #5a4bbd;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Rapport Linxo - Budget</h1>
+            <div class="date">{{ report_date }}</div>
+        </div>
+
+        <div class="content">
+            <div class="summary-box">
+                <div class="summary-item">
+                    <span class="summary-label">Dépenses variables</span>
+                    <span class="summary-value">{{ "%.2f"|format(total_variables) }} € / {{ budget_max }} €</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">{{ "Dépassement" if reste < 0 else "Reste disponible" }}</span>
+                    <span class="summary-value" style="color: {{ '#dc3545' if reste < 0 else '#28a745' }};">{{ "%.2f"|format(abs(reste)) }} €</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Utilisation du budget</span>
+                    <span class="summary-value">{{ "%.0f"|format(pourcentage) }}%</span>
+                </div>
+            </div>
+
+            <h2 style="font-size: 20px; margin-bottom: 15px; color: #333;">Dépenses par famille</h2>
+
+            <table class="families-table">
+                <thead>
+                    <tr>
+                        <th>Famille</th>
+                        <th style="text-align: right;">Montant</th>
+                        <th style="text-align: center;">Détail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for family in families %}
+                    <tr>
+                        <td class="family-name">{{ family.name }}</td>
+                        <td class="amount-cell">{{ "%.2f"|format(family.total) }} €</td>
+                        <td class="link-cell">
+                            <a href="{{ family.url }}" class="btn-detail">Voir →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td><strong>TOTAL</strong></td>
+                        <td class="amount-cell"><strong>{{ "%.2f"|format(grand_total) }} €</strong></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="cta-section">
+                <p><strong>📊 Consultez le rapport complet en ligne</strong></p>
+                <p>Accédez à tous les détails de vos dépenses par famille</p>
+                <a href="{{ index_url }}" class="btn-primary">Voir le rapport complet</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            🤖 Rapport généré automatiquement par votre Agent Linxo
+        </div>
+    </div>
+</body>
+</html>

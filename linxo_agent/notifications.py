@@ -170,19 +170,23 @@ class NotificationManager:
             traceback.print_exc()
             return {}
 
-    def send_budget_notification(self, analysis_result):
+    def send_budget_notification(self, analysis_result, report_index=None):
         """
         Envoie les notifications (email + SMS) pour le rapport budgétaire
-        Utilise le nouveau format visuel et épuré
+        Utilise le nouveau format avec liens vers rapports HTML
 
         Args:
             analysis_result: Résultat de l'analyse budgétaire (dict)
+            report_index: Index du rapport généré (ReportIndex, optionnel)
 
         Returns:
             dict: Résultats de l'envoi (email et SMS)
         """
         from datetime import datetime
         from analyzer import generer_conseil_budget
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        from pathlib import Path
+        import os
 
         print("\n[NOTIFICATION] Preparation des notifications...")
 
@@ -198,8 +202,47 @@ class NotificationManager:
         # Préparer le message SMS avec le nouveau format
         sms_msg = formater_sms_v2(total_depenses, budget_max, reste, pourcentage)
 
-        # Préparer l'email HTML avec le nouveau format
-        email_body_html = formater_email_html_v2(analysis_result, budget_max, conseil)
+        # Préparer l'email HTML
+        # Si report_index fourni, utiliser le nouveau template avec liens
+        if report_index:
+            print("[EMAIL] Utilisation du nouveau format avec liens vers rapports")
+            templates_dir = Path(__file__).parent.parent / 'templates' / 'email'
+            env = Environment(
+                loader=FileSystemLoader(templates_dir),
+                autoescape=select_autoescape(['html', 'xml'])
+            )
+            template = env.get_template('daily_summary.html.j2')
+
+            # Construire l'URL de l'index
+            base_url = os.getenv('REPORTS_BASE_URL', '')
+            if base_url:
+                index_relative = f"/reports/{report_index.report_date}/index.html"
+                index_url = f"{base_url.rstrip('/')}{index_relative}"
+
+                # Ajouter le token si signing_key disponible
+                signing_key = os.getenv('REPORTS_SIGNING_KEY')
+                if signing_key:
+                    from reports import generate_token
+                    token = generate_token(index_relative, signing_key)
+                    index_url = f"{index_url}?t={token}"
+            else:
+                # Fallback si base_url manquant
+                index_url = "#"
+
+            email_body_html = template.render(
+                report_date=report_index.report_date,
+                total_variables=total_depenses,
+                budget_max=budget_max,
+                reste=reste,
+                pourcentage=pourcentage,
+                families=report_index.families,
+                grand_total=report_index.grand_total,
+                index_url=index_url
+            )
+        else:
+            # Fallback: utiliser l'ancien format si pas de rapport généré
+            print("[EMAIL] Utilisation du format classique (rapport non généré)")
+            email_body_html = formater_email_html_v2(analysis_result, budget_max, conseil)
 
         # Sujet de l'email
         if reste < 0:
