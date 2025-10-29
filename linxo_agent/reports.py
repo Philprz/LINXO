@@ -5,7 +5,6 @@ Module de génération de rapports HTML par famille de dépenses
 Génère des pages HTML cliquables pour consultation détaillée
 """
 
-import os
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -251,7 +250,7 @@ def build_daily_report(
     Args:
         df: DataFrame avec colonnes: date, libelle, montant, categorie
         report_date: Date du rapport (défaut: aujourd'hui)
-        base_url: URL publique de base (doit être fournie, ex: https://linxo.itspirit.ovh/reports)
+        base_url: URL publique de base (doit être fournie, ex: https://linxo.appliprz.ovh/reports)
         signing_key: Clé pour signer les URLs (optionnel)
 
     Returns:

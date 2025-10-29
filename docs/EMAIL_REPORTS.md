@@ -28,7 +28,7 @@ Le système de rapports HTML génère automatiquement des pages web consultables
                │
      ┌─────────┴─────────┐
      │   Caddy (HTTPS)   │  Port 443 (public)
-     │ reverse_proxy     │  → linxo.itspirit.ovh/reports
+     │ reverse_proxy     │  → linxo.appliprz.ovh/reports
      └───────────────────┘
 ```
 
@@ -38,7 +38,7 @@ Le système de rapports HTML génère automatiquement des pages web consultables
 
 ```bash
 # URL publique (OBLIGATOIRE)
-REPORTS_BASE_URL=https://linxo.itspirit.ovh/reports
+REPORTS_BASE_URL=https://linxo.appliprz.ovh/reports
 
 # Basic Auth (OBLIGATOIRE)
 REPORTS_BASIC_USER=linxo
@@ -142,7 +142,7 @@ sudo nano /etc/caddy/Caddyfile
 2. **Ajouter la configuration**
 
 ```caddy
-linxo.itspirit.ovh {
+linxo.appliprz.ovh {
     # Autres routes existantes...
 
     # Route pour les rapports
@@ -155,7 +155,7 @@ linxo.itspirit.ovh {
 **Note**: L'authentification Basic Auth est gérée par l'application FastAPI. Vous pouvez optionnellement ajouter une couche supplémentaire via Caddy:
 
 ```caddy
-linxo.itspirit.ovh {
+linxo.appliprz.ovh {
     route /reports* {
         # Optionnel: Basic Auth côté Caddy (double protection)
         basicauth {
@@ -220,13 +220,13 @@ data/reports/
 
 **Sans token (nécessite Basic Auth)**:
 ```
-https://linxo.itspirit.ovh/reports/2025-01-15/index.html
-https://linxo.itspirit.ovh/reports/2025-01-15/family-alimentation.html
+https://linxo.appliprz.ovh/reports/2025-01-15/index.html
+https://linxo.appliprz.ovh/reports/2025-01-15/family-alimentation.html
 ```
 
 **Avec token HMAC (bypass Basic Auth pendant 24h)**:
 ```
-https://linxo.itspirit.ovh/reports/2025-01-15/index.html?t=abc123...
+https://linxo.appliprz.ovh/reports/2025-01-15/index.html?t=abc123...
 ```
 
 Le token permet un accès direct depuis les liens dans l'email, sans avoir à saisir username/password.
@@ -358,18 +358,18 @@ grep REPORTS_BASE_URL /home/linxo/LINXO/.env
 1. Vérifier que Caddy est correctement configuré:
    ```bash
    sudo systemctl status caddy
-   curl https://linxo.itspirit.ovh/reports/healthz
+   curl https://linxo.appliprz.ovh/reports/healthz
    ```
 
 2. Vérifier que `REPORTS_BASE_URL` correspond à l'URL Caddy:
    ```bash
    # Dans .env
-   REPORTS_BASE_URL=https://linxo.itspirit.ovh/reports
+   REPORTS_BASE_URL=https://linxo.appliprz.ovh/reports
    ```
 
 3. Tester l'authentification:
    ```bash
-   curl -u linxo:password https://linxo.itspirit.ovh/reports/healthz
+   curl -u linxo:password https://linxo.appliprz.ovh/reports/healthz
    ```
 
 ### Erreur 404 sur les rapports

@@ -11,7 +11,7 @@ from pathlib import Path
 
 # Configuration temporaire pour le test
 print("Configuration du test...")
-os.environ['REPORTS_BASE_URL'] = 'https://linxo.itspirit.ovh/reports'
+os.environ['REPORTS_BASE_URL'] = 'https://linxo.appliprz.ovh/reports'
 os.environ['REPORTS_BASIC_USER'] = 'linxo'
 os.environ['REPORTS_BASIC_PASS'] = 'test123'
 os.environ['REPORTS_SIGNING_KEY'] = 'vzsLO33H_yweU27HxYiRxujGftujaoQ9gPPQBQcjuyQ'
@@ -94,7 +94,7 @@ try:
     print(f"[INFO] Email sera envoyé depuis: {notification_manager.config.smtp_email}")
 
     # Étape 4: Envoyer l'email (sans SMS)
-    print(f"\n[4/4] Envoi de l'email...")
+    print("\n[4/4] Envoi de l'email...")
 
     # Appeler send_budget_notification avec le report_index
     results = notification_manager.send_budget_notification(
