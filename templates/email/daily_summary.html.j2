@@ -38,31 +38,63 @@
         .content {
             padding: 25px 30px;
         }
-        .summary-box {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border: 1px solid #dee2e6;
+        .metric {
+            margin-bottom: 12px;
+            font-size: 16px;
         }
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #e9ecef;
+        .metric-label {
+            color: #333;
+            margin-right: 8px;
         }
-        .summary-item:last-child {
-            border-bottom: none;
-        }
-        .summary-label {
-            font-size: 15px;
-            color: #495057;
-        }
-        .summary-value {
-            font-size: 18px;
+        .metric-value {
             font-weight: 700;
-            color: #7c69ef;
+            font-size: 18px;
+        }
+        .value-red { color: #dc3545; }
+        .value-green { color: {{ '#28a745' if reste >= 0 else '#dc3545' }}; }
+        .value-default { color: #333; }
+        .progress-section {
+            margin: 15px 0;
+        }
+        .progress-bar-container {
+            background-color: #e9ecef;
+            border-radius: 6px;
+            height: 28px;
+            position: relative;
+            width: 100%;
+            border: 1px solid #ddd;
+            overflow: visible;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            transition: width 0.3s ease;
+            border-radius: 5px 0 0 5px;
+        }
+        .progress-marker-100 {
+            position: absolute;
+            right: -2px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: #333;
+            z-index: 10;
+        }
+        .progress-marker-100::before {
+            content: '100%';
+            position: absolute;
+            right: -22px;
+            top: -24px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #333;
+            white-space: nowrap;
         }
         .families-table {
             width: 100%;
@@ -163,22 +195,42 @@
         </div>
 
         <div class="content">
-            <div class="summary-box">
-                <div class="summary-item">
-                    <span class="summary-label">Dépenses variables</span>
-                    <span class="summary-value">{{ "%.2f"|format(total_variables) }} € / {{ budget_max }} €</span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">{{ "Dépassement" if reste < 0 else "Reste disponible" }}</span>
-                    <span class="summary-value" style="color: {{ '#dc3545' if reste < 0 else '#28a745' }};">{{ "%.2f"|format(reste if reste >= 0 else -reste) }} €</span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Utilisation du budget</span>
-                    <span class="summary-value">{{ "%.0f"|format(pourcentage) }}%</span>
+            <div class="metric">
+                <span class="metric-label">Frais fixes</span>
+                <span class="metric-value value-red">{{ "%.2f"|format(total_fixes) }} €</span>
+                <span class="metric-label">/ {{ budget_fixes_prevu }} €</span>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: {{ pourcentage_fixes }}%; background: linear-gradient(90deg, {{ couleur_barre_fixes }} 0%, {{ couleur_barre_fixes }}dd 100%);">
+                        {{ "%.0f"|format(pourcentage_fixes) }}%
+                    </div>
+                    <div class="progress-marker-100"></div>
                 </div>
             </div>
 
-            <h2 style="font-size: 20px; margin-bottom: 15px; color: #333;">Dépenses par famille</h2>
+            <div class="metric">
+                <span class="metric-label">Dépenses variables</span>
+                <span class="metric-value value-red">{{ "%.2f"|format(total_variables) }} €</span>
+                <span class="metric-label">/ {{ budget_max }} €</span>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: {{ pourcentage }}%; background: linear-gradient(90deg, {{ couleur_barre_variables }} 0%, {{ couleur_barre_variables }}dd 100%);">
+                        {{ "%.0f"|format(pourcentage) }}%
+                    </div>
+                    <div class="progress-marker-100"></div>
+                </div>
+            </div>
+
+            <div class="metric" style="margin-top: 15px;">
+                <span class="metric-label">{{ "Dépassement" if reste < 0 else "Reste disponible" }}</span>
+                <span class="metric-value value-green">{{ "%.2f"|format(reste if reste >= 0 else -reste) }} €</span>
+            </div>
+
+            <h2 style="font-size: 20px; margin: 25px 0 15px 0; color: #333;">Dépenses par famille</h2>
 
             <table class="families-table">
                 <thead>

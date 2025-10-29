@@ -229,12 +229,52 @@ class NotificationManager:
                 # Fallback si base_url manquant
                 index_url = "#"
 
+            # Calculer les métriques pour frais fixes
+            total_fixes = analysis_result.get('total_fixes', 0)
+
+            # Calculer le budget fixes prévu
+            try:
+                depenses_fixes_ref = self.config.depenses_data.get('depenses_fixes', [])
+                budget_fixes_prevu = sum(d.get('montant', 0) for d in depenses_fixes_ref)
+            except:
+                budget_fixes_prevu = 3422  # Fallback
+
+            pourcentage_fixes = (total_fixes / budget_fixes_prevu * 100) if budget_fixes_prevu > 0 else 0
+
+            # Calculer l'avancement du mois pour les couleurs
+            from datetime import datetime
+            import calendar
+            now = datetime.now()
+            jour_actuel = now.day
+            dernier_jour = calendar.monthrange(now.year, now.month)[1]
+            avancement_mois = (jour_actuel / dernier_jour * 100)
+
+            # Couleurs pour barres de progression
+            if reste < 0:
+                couleur_barre_variables = "#dc3545"
+            elif pourcentage > avancement_mois + 10:
+                couleur_barre_variables = "#fd7e14"
+            else:
+                couleur_barre_variables = "#28a745"
+
+            if pourcentage_fixes > 100:
+                couleur_barre_fixes = "#dc3545"
+            elif pourcentage_fixes > 90:
+                couleur_barre_fixes = "#fd7e14"
+            else:
+                couleur_barre_fixes = "#28a745"
+
             email_body_html = template.render(
                 report_date=report_index.report_date,
                 total_variables=total_depenses,
+                total_fixes=total_fixes,
                 budget_max=budget_max,
+                budget_fixes_prevu=int(budget_fixes_prevu),
                 reste=reste,
                 pourcentage=pourcentage,
+                pourcentage_fixes=pourcentage_fixes,
+                couleur_barre_variables=couleur_barre_variables,
+                couleur_barre_fixes=couleur_barre_fixes,
                 families=report_index.families,
                 grand_total=report_index.grand_total,
                 index_url=index_url
