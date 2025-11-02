@@ -198,18 +198,103 @@ class Config:
         if not self.sms_recipients:
             print("[WARN] ATTENTION: Aucun destinataire SMS configure")
 
-    def get_latest_csv(self):
-        """Retourne le chemin du dernier fichier CSV téléchargé"""
+    def get_latest_csv(self, check_already_sent=True):
+        """
+        Retourne le chemin du dernier fichier CSV téléchargé
+
+        Args:
+            check_already_sent: Si True, vérifie que le fichier n'a pas déjà été envoyé
+
+        Returns:
+            Path ou None si aucun nouveau fichier à traiter
+        """
         csv_files = list(self.data_dir.glob('*.csv'))
         if csv_files:
-            return max(csv_files, key=lambda p: p.stat().st_mtime)
+            latest = max(csv_files, key=lambda p: p.stat().st_mtime)
+
+            if check_already_sent and self._is_csv_already_sent(latest):
+                print(f"[INFO] Le fichier {latest.name} a déjà été envoyé aujourd'hui")
+                return None
+
+            return latest
 
         # Fallback: chercher dans downloads
         csv_files = list(self.downloads_dir.glob('*.csv'))
         if csv_files:
-            return max(csv_files, key=lambda p: p.stat().st_mtime)
+            latest = max(csv_files, key=lambda p: p.stat().st_mtime)
+
+            if check_already_sent and self._is_csv_already_sent(latest):
+                print(f"[INFO] Le fichier {latest.name} a déjà été envoyé aujourd'hui")
+                return None
+
+            return latest
 
         return self.data_dir / 'latest.csv'
+
+    def _is_csv_already_sent(self, csv_path):
+        """
+        Vérifie si un fichier CSV a déjà été envoyé aujourd'hui
+
+        Args:
+            csv_path: Chemin du fichier CSV
+
+        Returns:
+            bool: True si déjà envoyé
+        """
+        sent_reports_file = self.data_dir / 'sent_reports.json'
+
+        # Créer le fichier s'il n'existe pas
+        if not sent_reports_file.exists():
+            return False
+
+        try:
+            with open(sent_reports_file, 'r', encoding='utf-8') as f:
+                sent_reports = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return False
+
+        # Identifier le fichier par son hash ou sa date de modification
+        csv_key = f"{csv_path.name}_{csv_path.stat().st_mtime}"
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Vérifier si déjà envoyé aujourd'hui
+        return sent_reports.get(csv_key) == today
+
+    def mark_csv_as_sent(self, csv_path):
+        """
+        Marque un fichier CSV comme envoyé aujourd'hui
+
+        Args:
+            csv_path: Chemin du fichier CSV
+        """
+        sent_reports_file = self.data_dir / 'sent_reports.json'
+
+        # Charger les envois existants
+        sent_reports = {}
+        if sent_reports_file.exists():
+            try:
+                with open(sent_reports_file, 'r', encoding='utf-8') as f:
+                    sent_reports = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                sent_reports = {}
+
+        # Ajouter le nouvel envoi
+        csv_key = f"{csv_path.name}_{csv_path.stat().st_mtime}"
+        today = datetime.now().strftime('%Y-%m-%d')
+        sent_reports[csv_key] = today
+
+        # Nettoyer les anciennes entrées (garder seulement les 30 derniers jours)
+        from datetime import timedelta
+        cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        sent_reports = {k: v for k, v in sent_reports.items() if v >= cutoff_date}
+
+        # Sauvegarder
+        try:
+            with open(sent_reports_file, 'w', encoding='utf-8') as f:
+                json.dump(sent_reports, f, indent=2)
+            print(f"[OK] Fichier {csv_path.name} marqué comme envoyé")
+        except OSError as e:
+            print(f"[WARN] Erreur lors de la sauvegarde du suivi: {e}")
 
     def print_summary(self):
         """Affiche un résumé de la configuration"""

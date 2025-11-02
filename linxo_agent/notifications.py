@@ -1,355 +1,853 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Module de notifications unifié pour Linxo Agent
-Gère l'envoi d'emails et de SMS via différents canaux
-Version 2.0 - Refactorisé avec configuration unifiée
+Module de notifications unifié pour Linxo Agent.
+
+- Envoi d'emails (SMTP SSL/TLS)
+- Envoi de SMS via OVH (API REST)
+- Chargement de la config depuis linxo_agent.config.get_config() si disponible,
+  sinon depuis les variables d'environnement.
+- Journalisation standard via logging.
+- Conçu pour passer Pylint : docstrings, types, pas d'exceptions trop générales,
+  pas de variables globales cachées, pas de mutable default args, etc.
+
+Note: Fournit en plus une façade optionnelle `send_budget_notification` qui
+restitue la fonctionnalité V1 sans couplage fort. Elle fonctionne même si Jinja2
+ou les formateurs ne sont pas installés (fallback texte).
 """
 
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
 import smtplib
-from email.mime.text import MIMEText
+import ssl
+from dataclasses import dataclass, field
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
+from email.mime.text import MIMEText
 from pathlib import Path
-import sys
+from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
-# Import du module de configuration unifié
-try:
-    from config import get_config
-    from report_formatter_v2 import formater_email_html_v2, formater_sms_v2
-except ImportError:
-    sys.path.insert(0, str(Path(__file__).parent))
-    from config import get_config
-    from report_formatter_v2 import formater_email_html_v2, formater_sms_v2
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+LOGGER = logging.getLogger("linxo.notifications")
+if not LOGGER.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    )
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
 
 
-class NotificationManager:
-    """Gestionnaire centralisé des notifications"""
+class NotificationError(Exception):
+    """Erreur générique pour l'envoi des notifications."""
 
-    def __init__(self):
-        """Initialise le gestionnaire avec la configuration"""
-        self.config = get_config()
 
-    def send_email(self, subject, body, recipients=None, attachment_path=None, is_html=False):
-        """
-        Envoie un email via SMTP Gmail
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 
-        Args:
-            subject: Sujet de l'email
-            body: Corps de l'email (texte ou HTML)
-            recipients: Liste d'adresses email (optionnel, utilise config par défaut)
-            attachment_path: Chemin vers une pièce jointe (optionnel)
-            is_html: True si le body est en HTML
+def _to_list(value: Union[str, Sequence[str], None]) -> List[str]:
+    """Convertit une valeur en liste, nettoyée et sans doublons."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        items = [v.strip() for v in value.split(",") if v.strip()]
+        return list(dict.fromkeys(items))
+    return list(dict.fromkeys([str(v).strip() for v in value if str(v).strip()]))
 
-        Returns:
-            bool: True si envoi réussi, False sinon
-        """
-        try:
-            # Utiliser les destinataires de la config si non fournis
-            if recipients is None:
-                recipients = self.config.notification_emails
 
-            if not recipients:
-                print("[ERREUR] Aucun destinataire email configure")
-                return False
+def _env_bool(key: str, default: bool = False) -> bool:
+    """Lit un booléen depuis l'environnement (1/true/yes/on)."""
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
-            # S'assurer que c'est une liste
-            if isinstance(recipients, str):
-                recipients = [recipients]
 
-            # Créer le message
-            msg = MIMEMultipart()
-            msg['Subject'] = subject
-            msg['From'] = f"Agent Linxo <{self.config.smtp_email}>"
-            msg['To'] = ', '.join(recipients)
+def _safe_int(value: Union[str, int, None], default: int) -> int:
+    """Convertit en int en sécurité."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
-            # Ajouter le corps du message
-            if is_html:
-                body_part = MIMEText(body, 'html', 'utf-8')
-            else:
-                body_part = MIMEText(body, 'plain', 'utf-8')
-            msg.attach(body_part)
 
-            # Ajouter une pièce jointe si fournie
-            if attachment_path and Path(attachment_path).exists():
-                with open(attachment_path, 'rb') as f:
-                    part = MIMEBase('application', 'octet-stream')
-                    part.set_payload(f.read())
-                    encoders.encode_base64(part)
+@dataclass(frozen=True)
+class EmailSettings:
+    """Paramètres d'envoi email."""
+    host: str
+    port: int
+    username: str
+    password: str
+    sender: str
+    use_ssl: bool = True
+    use_starttls: bool = False
+    default_recipients: Tuple[str, ...] = field(default_factory=tuple)
 
-                    filename = Path(attachment_path).name
-                    part.add_header('Content-Disposition', f'attachment; filename={filename}')
-                    msg.attach(part)
 
-                print(f"[INFO] Piece jointe ajoutee: {filename}")
+@dataclass(frozen=True)
+class OvhSmsSettings:
+    """Paramètres OVH SMS (API v1, Europe)."""
+    endpoint: str  # ex: "ovh-eu"
+    application_key: str
+    application_secret: str
+    consumer_key: str
+    account: str  # ex: "sms-xxxxxx-1"
+    sender: str  # ex: "ITSPIRIT"
+    default_recipients: Tuple[str, ...] = field(default_factory=tuple)
 
-            # Envoyer l'email
-            print(f"[EMAIL] Connexion au serveur SMTP {self.config.smtp_server}:{self.config.smtp_port}...")
 
-            server = smtplib.SMTP(self.config.smtp_server, self.config.smtp_port)
-            server.starttls()
-            server.login(self.config.smtp_email, self.config.smtp_password)
-            server.send_message(msg)
-            server.quit()
+@dataclass(frozen=True)
+class NotificationConfig:
+    """Configuration unifiée notifications."""
+    emails: Optional[EmailSettings] = None
+    ovh_sms: Optional[OvhSmsSettings] = None
 
-            print(f"[SUCCESS] Email envoye a: {', '.join(recipients)}")
-            return True
 
-        except Exception as e:
-            print(f"[ERREUR] Echec envoi email: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+def _try_import_get_config() -> Any:
+    """
+    Tente d'importer `get_config` depuis linxo_agent.config.
+    Retourne l'objet fonction si disponible, sinon None.
+    """
+    try:
+        from linxo_agent.config import get_config as _get_config  # type: ignore
+        return _get_config
+    except Exception:  # pylint: disable=broad-except
+        return None
 
-    def send_sms_ovh(self, message, recipients=None):
-        """
-        Envoie un SMS via OVH (méthode email-to-SMS)
 
-        Args:
-            message: Texte du SMS (max 160 caractères)
-            recipients: Liste de numéros de téléphone (optionnel, utilise config par défaut)
+def _config_from_env() -> NotificationConfig:
+    """
+    Construit une config minimale depuis l'environnement.
 
-        Returns:
-            dict: Résultats de l'envoi pour chaque destinataire
-        """
-        try:
-            # Utiliser les destinataires de la config si non fournis
-            if recipients is None:
-                recipients = self.config.sms_recipients
+    Variables supportées (emails) :
+      - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_SENDER,
+        SMTP_USE_SSL (bool), SMTP_USE_STARTTLS (bool),
+        NOTIFICATION_EMAILS (liste séparée par des virgules)
 
-            if not recipients:
-                print("[ERREUR] Aucun destinataire SMS configure")
-                return {}
-
-            # S'assurer que c'est une liste
-            if isinstance(recipients, str):
-                recipients = [recipients]
-
-            # Tronquer le message si trop long
-            if len(message) > 160:
-                message = message[:157] + "..."
-                print(f"[WARNING] Message SMS tronque a 160 caracteres")
-
-            results = {}
-
-            # Envoyer un SMS à chaque destinataire
-            for phone in recipients:
-                try:
-                    # Format du sujet pour OVH: compte:utilisateur:password:expediteur:destinataire
-                    subject = f"{self.config.ovh_compte_sms}:{self.config.ovh_utilisateur_sms}:{self.config.ovh_mot_de_passe_sms}:{self.config.ovh_expediteur_sms}:{phone}"
-
-                    msg = MIMEMultipart()
-                    msg['Subject'] = subject
-                    msg['From'] = self.config.smtp_email
-                    msg['To'] = self.config.ovh_email
-
-                    body = MIMEText(message, 'plain', 'utf-8')
-                    msg.attach(body)
-
-                    print(f"[SMS] Envoi SMS via OVH a {phone}...")
-
-                    server = smtplib.SMTP(self.config.smtp_server, self.config.smtp_port)
-                    server.starttls()
-                    server.login(self.config.smtp_email, self.config.smtp_password)
-                    server.send_message(msg)
-                    server.quit()
-
-                    print(f"[SUCCESS] SMS envoye a {phone}")
-                    results[phone] = True
-
-                except Exception as e:
-                    print(f"[ERREUR] Echec SMS pour {phone}: {e}")
-                    results[phone] = False
-
-            return results
-
-        except Exception as e:
-            print(f"[ERREUR] Erreur generale SMS: {e}")
-            import traceback
-            traceback.print_exc()
-            return {}
-
-    def send_budget_notification(self, analysis_result, report_index=None):
-        """
-        Envoie les notifications (email + SMS) pour le rapport budgétaire
-        Utilise le nouveau format avec liens vers rapports HTML
-
-        Args:
-            analysis_result: Résultat de l'analyse budgétaire (dict)
-            report_index: Index du rapport généré (ReportIndex, optionnel)
-
-        Returns:
-            dict: Résultats de l'envoi (email et SMS)
-        """
-        from datetime import datetime
-        from analyzer import generer_conseil_budget
-        from jinja2 import Environment, FileSystemLoader, select_autoescape
-        from pathlib import Path
-        import os
-
-        print("\n[NOTIFICATION] Preparation des notifications...")
-
-        # Extraire les données
-        total_depenses = analysis_result.get('total_variables', 0)
-        budget_max = analysis_result.get('budget_max', self.config.budget_variable)
-        reste = budget_max - total_depenses
-        pourcentage = (total_depenses / budget_max * 100) if budget_max > 0 else 0
-
-        # Générer le conseil personnalisé
-        conseil = generer_conseil_budget(total_depenses, budget_max)
-
-        # Préparer le message SMS avec le nouveau format
-        sms_msg = formater_sms_v2(total_depenses, budget_max, reste, pourcentage)
-
-        # Préparer l'email HTML
-        # Si report_index fourni, utiliser le nouveau template avec liens
-        if report_index:
-            print("[EMAIL] Utilisation du nouveau format avec liens vers rapports")
-            templates_dir = Path(__file__).parent.parent / 'templates' / 'email'
-            env = Environment(
-                loader=FileSystemLoader(templates_dir),
-                autoescape=select_autoescape(['html', 'xml'])
-            )
-            template = env.get_template('daily_summary.html.j2')
-
-            # Construire l'URL de l'index
-            base_url = os.getenv('REPORTS_BASE_URL', '')
-            if base_url:
-                index_relative = f"/reports/{report_index.report_date}/index.html"
-                index_url = f"{base_url.rstrip('/')}{index_relative}"
-
-                # Ajouter le token si signing_key disponible
-                signing_key = os.getenv('REPORTS_SIGNING_KEY')
-                if signing_key:
-                    from reports import generate_token
-                    token = generate_token(index_relative, signing_key)
-                    index_url = f"{index_url}?t={token}"
-            else:
-                # Fallback si base_url manquant
-                index_url = "#"
-
-            # Calculer les métriques pour frais fixes
-            total_fixes = analysis_result.get('total_fixes', 0)
-
-            # Calculer le budget fixes prévu
-            try:
-                depenses_fixes_ref = self.config.depenses_data.get('depenses_fixes', [])
-                budget_fixes_prevu = sum(d.get('montant', 0) for d in depenses_fixes_ref)
-            except:
-                budget_fixes_prevu = 3422  # Fallback
-
-            pourcentage_fixes = (total_fixes / budget_fixes_prevu * 100) if budget_fixes_prevu > 0 else 0
-
-            # Calculer l'avancement du mois pour les couleurs
-            from datetime import datetime
-            import calendar
-            now = datetime.now()
-            jour_actuel = now.day
-            dernier_jour = calendar.monthrange(now.year, now.month)[1]
-            avancement_mois = (jour_actuel / dernier_jour * 100)
-
-            # Couleurs pour barres de progression
-            if reste < 0:
-                couleur_barre_variables = "#dc3545"
-            elif pourcentage > avancement_mois + 10:
-                couleur_barre_variables = "#fd7e14"
-            else:
-                couleur_barre_variables = "#28a745"
-
-            if pourcentage_fixes > 100:
-                couleur_barre_fixes = "#dc3545"
-            elif pourcentage_fixes > 90:
-                couleur_barre_fixes = "#fd7e14"
-            else:
-                couleur_barre_fixes = "#28a745"
-
-            email_body_html = template.render(
-                report_date=report_index.report_date,
-                total_variables=total_depenses,
-                total_fixes=total_fixes,
-                budget_max=budget_max,
-                budget_fixes_prevu=int(budget_fixes_prevu),
-                reste=reste,
-                pourcentage=pourcentage,
-                pourcentage_fixes=pourcentage_fixes,
-                couleur_barre_variables=couleur_barre_variables,
-                couleur_barre_fixes=couleur_barre_fixes,
-                families=report_index.families,
-                grand_total=report_index.grand_total,
-                index_url=index_url
-            )
-        else:
-            # Fallback: utiliser l'ancien format si pas de rapport généré
-            print("[EMAIL] Utilisation du format classique (rapport non généré)")
-            email_body_html = formater_email_html_v2(analysis_result, budget_max, conseil)
-
-        # Sujet de l'email
-        if reste < 0:
-            email_subject = f"🔴 ALERTE Budget - Dépassement de {abs(reste):.0f}€"
-        elif pourcentage >= 80:
-            email_subject = f"🟠 Budget à {pourcentage:.0f}% - Attention"
-        else:
-            email_subject = f"🟢 Rapport Budget - {datetime.now().strftime('%d/%m/%Y')}"
-
-        # Envoyer les notifications
-        results = {}
-
-        # SMS
-        print("\n[SMS] Envoi des SMS...")
-        results['sms'] = self.send_sms_ovh(sms_msg)
-
-        # Email
-        print("\n[EMAIL] Envoi des emails...")
-        csv_path = analysis_result.get('csv_path')
-        results['email'] = self.send_email(
-            email_subject,
-            email_body_html,
-            attachment_path=csv_path,
-            is_html=True
+    Variables supportées (OVH SMS) :
+      - OVH_ENDPOINT (ex: ovh-eu)
+      - OVH_APP_KEY, OVH_APP_SECRET, OVH_CONSUMER_KEY
+      - OVH_SMS_ACCOUNT (ex: sms-xxxxxx-1)
+      - OVH_SMS_SENDER (alphanum 3-11 chars)
+      - OVH_SMS_RECIPIENTS (liste séparée par des virgules)
+    """
+    email_settings: Optional[EmailSettings] = None
+    if os.getenv("SMTP_HOST") and os.getenv("SMTP_SENDER"):
+        email_settings = EmailSettings(
+            host=os.getenv("SMTP_HOST", ""),
+            port=_safe_int(os.getenv("SMTP_PORT"), 465),
+            username=os.getenv("SMTP_USER", ""),
+            password=os.getenv("SMTP_PASSWORD", ""),
+            sender=os.getenv("SMTP_SENDER", ""),
+            use_ssl=_env_bool("SMTP_USE_SSL", True),
+            use_starttls=_env_bool("SMTP_USE_STARTTLS", False),
+            default_recipients=tuple(_to_list(os.getenv("NOTIFICATION_EMAILS"))),
         )
 
-        return results
+    ovh_settings: Optional[OvhSmsSettings] = None
+    if os.getenv("OVH_ENDPOINT") and os.getenv("OVH_APP_KEY"):
+        ovh_settings = OvhSmsSettings(
+            endpoint=os.getenv("OVH_ENDPOINT", "ovh-eu"),
+            application_key=os.getenv("OVH_APP_KEY", ""),
+            application_secret=os.getenv("OVH_APP_SECRET", ""),
+            consumer_key=os.getenv("OVH_CONSUMER_KEY", ""),
+            account=os.getenv("OVH_SMS_ACCOUNT", ""),
+            sender=os.getenv("OVH_SMS_SENDER", ""),
+            default_recipients=tuple(_to_list(os.getenv("OVH_SMS_RECIPIENTS"))),
+        )
+
+    return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings)
 
 
-# Fonction de test
+def load_notification_config() -> NotificationConfig:
+    """
+    Charge la configuration (priorité au module `linxo_agent.config` si présent).
+    Fallback : variables d'environnement.
+    """
+    get_config = _try_import_get_config()
+    if get_config is None:
+        LOGGER.debug("get_config() indisponible, lecture depuis l'environnement")
+        return _config_from_env()
+
+    cfg = get_config()  # type: ignore[operator]
+
+    def _get(mapping_or_obj: Any, key: str, default: Any = "") -> Any:
+        if isinstance(mapping_or_obj, Mapping):
+            return mapping_or_obj.get(key, default)
+        return getattr(mapping_or_obj, key, default)
+
+    # Email
+    email_settings: Optional[EmailSettings] = None
+    smtp_host = _get(cfg, "smtp_host", "") or os.getenv("SMTP_HOST", "")
+    smtp_sender = _get(cfg, "smtp_sender", "") or os.getenv("SMTP_SENDER", "")
+    if smtp_host and smtp_sender:
+        email_settings = EmailSettings(
+            host=str(smtp_host),
+            port=int(_get(cfg, "smtp_port", os.getenv("SMTP_PORT") or 465)),
+            username=str(_get(cfg, "smtp_username", os.getenv("SMTP_USER", ""))),
+            password=str(_get(cfg, "smtp_password", os.getenv("SMTP_PASSWORD", ""))),
+            sender=str(smtp_sender),
+            use_ssl=bool(_get(cfg, "smtp_use_ssl", _env_bool("SMTP_USE_SSL", True))),
+            use_starttls=bool(
+                _get(cfg, "smtp_use_starttls", _env_bool("SMTP_USE_STARTTLS", False))
+            ),
+            default_recipients=tuple(
+                _to_list(str(_get(cfg, "notification_emails", os.getenv("NOTIFICATION_EMAILS") or "")))
+            ),
+        )
+
+    # OVH SMS
+    ovh_settings: Optional[OvhSmsSettings] = None
+    ovh_endpoint = str(_get(cfg, "ovh_endpoint", os.getenv("OVH_ENDPOINT", "")))
+    ovh_app_key = str(_get(cfg, "ovh_application_key", os.getenv("OVH_APP_KEY", "")))
+    if ovh_endpoint and ovh_app_key:
+        ovh_settings = OvhSmsSettings(
+            endpoint=ovh_endpoint or "ovh-eu",
+            application_key=ovh_app_key,
+            application_secret=str(
+                _get(cfg, "ovh_application_secret", os.getenv("OVH_APP_SECRET", ""))
+            ),
+            consumer_key=str(_get(cfg, "ovh_consumer_key", os.getenv("OVH_CONSUMER_KEY", ""))),
+            account=str(_get(cfg, "ovh_sms_account", os.getenv("OVH_SMS_ACCOUNT", ""))),
+            sender=str(_get(cfg, "ovh_sms_sender", os.getenv("OVH_SMS_SENDER", ""))),
+            default_recipients=tuple(
+                _to_list(str(_get(cfg, "notification_sms_recipients", os.getenv("OVH_SMS_RECIPIENTS") or "")))
+            ),
+        )
+
+    return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings)
+
+
+# ---------------------------------------------------------------------------
+# Utils
+# ---------------------------------------------------------------------------
+
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+_PHONE_RE = re.compile(r"^\+?[1-9]\d{6,14}$")  # E.164 approx
+
+
+def _validate_emails(emails: Iterable[str]) -> List[str]:
+    """Retourne la liste des emails valides (filtre silencieux)."""
+    valid = []
+    for addr in emails:
+        addr_norm = addr.strip()
+        if addr_norm and _EMAIL_RE.match(addr_norm):
+            valid.append(addr_norm)
+        else:
+            LOGGER.warning("Adresse email invalide ignorée: %s", addr)
+    return valid
+
+
+def _validate_phones(phones: Iterable[str]) -> List[str]:
+    """Retourne la liste des numéros valides en format proche E.164."""
+    valid = []
+    for num in phones:
+        num_norm = num.strip().replace(" ", "")
+        if num_norm.startswith("0") and not num_norm.startswith("+"):
+            num_norm = "+33" + num_norm[1:]
+        if _PHONE_RE.match(num_norm):
+            valid.append(num_norm)
+        else:
+            LOGGER.warning("Numéro de téléphone invalide ignoré: %s", num)
+    return valid
+
+
+def _add_attachments(msg: MIMEMultipart, attachments: Iterable[Union[str, Path]]) -> None:
+    """Ajoute des pièces jointes à un message MIME."""
+    for item in attachments:
+        path = Path(item)
+        if not path.exists():
+            LOGGER.warning("Pièce jointe introuvable: %s", path)
+            continue
+        with path.open("rb") as fobj:
+            payload = MIMEApplication(fobj.read(), Name=path.name)
+        payload["Content-Disposition"] = f'attachment; filename="{path.name}"'
+        msg.attach(payload)
+
+
+# ---------------------------------------------------------------------------
+# Notification Manager
+# ---------------------------------------------------------------------------
+
+class NotificationManager:
+    """
+    Manager unifié pour emails et SMS.
+
+    Parameters
+    ----------
+    config : Optional[NotificationConfig]
+        Config explicite. Si None, on tente `load_notification_config()`.
+    """
+
+    def __init__(self, config: Optional[NotificationConfig] = None) -> None:
+        self._config: NotificationConfig = config or load_notification_config()
+        LOGGER.debug("NotificationManager initialisé: %s", self._config)
+
+    # ------------------------------- EMAIL ---------------------------------
+
+    def send_email(
+        self,
+        subject: str,
+        body_text: str,
+        recipients: Optional[Iterable[str]] = None,
+        *,
+        html_body: Optional[str] = None,
+        attachments: Optional[Iterable[Union[str, Path]]] = None,
+        reply_to: Optional[str] = None,
+        cc: Optional[Iterable[str]] = None,
+        bcc: Optional[Iterable[str]] = None,
+    ) -> bool:
+        """
+        Envoie un email.
+
+        Returns
+        -------
+        bool
+            True si l'envoi a (semble) réussi, False sinon.
+        """
+        if self._config.emails is None:
+            LOGGER.error("Configuration email indisponible.")
+            return False
+
+        settings = self._config.emails
+        to_list = _validate_emails(recipients or settings.default_recipients)
+        cc_list = _validate_emails(cc or [])
+        bcc_list = _validate_emails(bcc or [])
+
+        if not to_list and not cc_list and not bcc_list:
+            LOGGER.error("Aucun destinataire email valide.")
+            return False
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = settings.sender
+        msg["To"] = ", ".join(to_list)
+        if cc_list:
+            msg["Cc"] = ", ".join(cc_list)
+        if reply_to:
+            msg.add_header("Reply-To", reply_to)
+
+        msg.attach(MIMEText(body_text or "", "plain", "utf-8"))
+        if html_body:
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        if attachments:
+            _add_attachments(msg, attachments)
+
+        recipients_all = list(dict.fromkeys([*to_list, *cc_list, *bcc_list]))
+
+        try:
+            if settings.use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(settings.host, settings.port, context=context) as smtp:
+                    if settings.username:
+                        smtp.login(settings.username, settings.password)
+                    smtp.sendmail(settings.sender, recipients_all, msg.as_string())
+            else:
+                with smtplib.SMTP(settings.host, settings.port) as smtp:
+                    if settings.use_starttls:
+                        context = ssl.create_default_context()
+                        smtp.starttls(context=context)
+                    if settings.username:
+                        smtp.login(settings.username, settings.password)
+                    smtp.sendmail(settings.sender, recipients_all, msg.as_string())
+
+            LOGGER.info("Email envoyé à %s", recipients_all)
+            return True
+
+        except smtplib.SMTPException as exc:
+            LOGGER.exception("Echec envoi email (SMTPException) : %s", exc)
+            return False
+
+    # ------------------------------- SMS OVH -------------------------------
+
+    def send_sms_ovh(
+        self,
+        message: str,
+        recipients: Optional[Iterable[str]] = None,
+        *,
+        no_stop_clause: bool = False,
+    ) -> bool:
+        """
+        Envoie un SMS via OVH.
+
+        Notes
+        -----
+        - Requiert le package `requests`. Si absent, logge un avertissement et échoue.
+        - Le message est automatiquement tronqué à 160 caractères (1 SMS) si
+          l'option de concaténation n'est pas activée côté compte OVH.
+        """
+        if self._config.ovh_sms is None:
+            LOGGER.error("Configuration OVH SMS indisponible.")
+            return False
+
+        try:
+            import requests  # type: ignore
+        except Exception:  # pylint: disable=broad-except
+            LOGGER.error("Le package 'requests' est requis pour OVH SMS.")
+            return False
+
+        settings = self._config.ovh_sms
+        to_list = _validate_phones(recipients or settings.default_recipients)
+        if not to_list:
+            LOGGER.error("Aucun destinataire SMS valide.")
+            return False
+
+        final_message = message.strip()
+        if not no_stop_clause and "STOP" not in final_message.upper():
+            final_message = f"{final_message} STOP au 36180"
+
+        if len(final_message) > 160:
+            LOGGER.warning("Message > 160 chars, tronqué pour envoi simple SMS.")
+            final_message = final_message[:160]
+
+        base_url = "https://eu.api.ovh.com/1.0"
+        url = f"{base_url}/sms/{settings.account}/jobs"
+
+        payload: MutableMapping[str, Any] = {
+            "message": final_message,
+            "sender": settings.sender,
+            "receivers": to_list,
+            "noStopClause": no_stop_clause,
+            "priority": "high",
+        }
+
+        def _build_ovh_headers(body: MutableMapping[str, Any]) -> Mapping[str, str]:
+            """Construit les headers OVH signés."""
+            import time
+            import hashlib
+            import hmac
+
+            body_str = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
+
+            # Time: utiliser /auth/time (réponse = timestamp epoch)
+            ovh_time = int(requests.get(f"{base_url}/auth/time", timeout=10).text)
+
+            to_sign = "+".join(
+                [
+                    settings.application_secret,
+                    settings.consumer_key,
+                    "POST",
+                    url,
+                    body_str,
+                    str(ovh_time),
+                ]
+            ).encode("utf-8")
+
+            signature = "$1$" + hmac.new(
+                settings.application_secret.encode("utf-8"),
+                to_sign,
+                hashlib.sha1,
+            ).hexdigest()
+
+            headers = {
+                "X-Ovh-Application": settings.application_key,
+                "X-Ovh-Consumer": settings.consumer_key,
+                "X-Ovh-Signature": signature,
+                "X-Ovh-Timestamp": str(ovh_time),
+                "Content-type": "application/json; charset=utf-8",
+            }
+            _ = time.time()  # évite lint sur import local
+            return headers
+
+        try:
+            headers = _build_ovh_headers(payload)
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            if response.status_code // 100 != 2:
+                LOGGER.error("Echec OVH SMS (%s): %s", response.status_code, response.text[:500])
+                return False
+
+            LOGGER.info("SMS OVH envoyé à %s", to_list)
+            return True
+
+        except Exception as exc:  # requests.RequestException compatible
+            LOGGER.exception("Echec requête OVH SMS : %s", exc)
+            return False
+
+    # -------------------------- Façades & budget ---------------------------
+
+    def notify_quick(
+        self,
+        subject: str,
+        message: str,
+        *,
+        email: bool = True,
+        sms: bool = False,
+        html_body: Optional[str] = None,
+        attachments: Optional[Iterable[Union[str, Path]]] = None,
+    ) -> Tuple[bool, bool]:
+        """
+        Notifie rapidement par email et/ou SMS.
+
+        Returns
+        -------
+        (email_ok, sms_ok) : Tuple[bool, bool]
+        """
+        email_ok = True
+        sms_ok = True
+
+        if email:
+            email_ok = self.send_email(
+                subject=subject,
+                body_text=message,
+                html_body=html_body,
+                attachments=attachments,
+            )
+
+        if sms:
+            sms_ok = self.send_sms_ovh(message)
+
+        return email_ok, sms_ok
+
+    # --- Optionnel : réintègre la fonction V1 de notification budget ---
+
+    def send_budget_notification(
+        self,
+        analysis_result: Mapping[str, Any],
+        report_index: Any = None,
+    ) -> Mapping[str, Any]:
+        """
+        Envoie les notifications (email + SMS) pour le rapport budgétaire.
+
+        - Utilise si dispo: formater_sms_v2 / formater_email_html_v2
+        - Si `report_index` fourni et Jinja2 dispo, tente un HTML avec lien index
+        - Fallback texte sinon
+        """
+        total_depenses = float(
+            analysis_result.get("total_variables", 0) or 0
+        )  # type: ignore[arg-type]
+        budget_max = float(analysis_result.get("budget_max", 0) or 0)  # type: ignore[arg-type]
+        reste = budget_max - total_depenses
+        pct = (total_depenses / budget_max * 100) if budget_max > 0 else 0.0
+
+        # SMS via formateur si dispo
+        sms_msg = None
+        try:
+            from report_formatter_v2 import formater_sms_v2  # type: ignore
+            sms_msg = formater_sms_v2(total_depenses, budget_max, reste, pct)
+        except Exception:  # pylint: disable=broad-except
+            sms_msg = (
+                f"Budget: {total_depenses:.0f}/{budget_max:.0f}€ "
+                f"({pct:.0f}%), reste {reste:.0f}€"
+            )
+
+        # Sujet
+        from datetime import datetime as _dt
+        if reste < 0:
+            subject = f"🔴 ALERTE Budget - Dépassement de {abs(reste):.0f}€"
+        elif pct >= 80:
+            subject = f"🟠 Budget à {pct:.0f}% - Attention"
+        else:
+            subject = f"🟢 Rapport Budget - {_dt.now().strftime('%d/%m/%Y')}"
+
+        # Corps HTML:
+        html_body: Optional[str] = None
+        try:
+            if report_index is not None:
+                # Essai rendu Jinja2 si présent
+                from jinja2 import Environment, FileSystemLoader, select_autoescape  # type: ignore
+                import os as _os
+
+                templates_dir = Path(__file__).parent.parent / "templates" / "email"
+                env = Environment(
+                    loader=FileSystemLoader(templates_dir),
+                    autoescape=select_autoescape(["html", "xml"]),
+                )
+                template = env.get_template("daily_summary.html.j2")
+
+                base_url = _os.getenv("REPORTS_BASE_URL", "")
+                index_url = "#"
+                if base_url:
+                    report_date = getattr(report_index, "report_date", "")
+                    index_relative = f"/reports/{report_date}/index.html"
+                    index_url = f"{base_url.rstrip('/')}{index_relative}"
+                    signing_key = _os.getenv("REPORTS_SIGNING_KEY")
+                    if signing_key:
+                        # token si présent
+                        try:
+                            from reports import generate_token  # type: ignore
+                            token = generate_token(index_relative, signing_key)
+                            index_url = f"{index_url}?t={token}"
+                        except Exception:  # pylint: disable=broad-except
+                            pass
+
+                total_fixes = float(
+                    analysis_result.get("total_fixes", 0) or 0
+                )  # type: ignore[arg-type]
+                try:
+                    # si la config expose les dépenses fixes de référence
+                    cfg = _try_import_get_config()
+                    depenses_fixes_ref = []  # type: ignore[assignment]
+                    if cfg:
+                        c = cfg()  # type: ignore[operator]
+                        depenses_fixes_ref = getattr(
+                            c, "depenses_data", {}
+                        ).get("depenses_fixes", [])  # type: ignore[assignment, index]
+                    budget_fixes_prevu = sum(
+                        float(d.get("montant", 0) or 0)  # type: ignore[call-arg]
+                        for d in depenses_fixes_ref
+                    )
+                except Exception:  # pylint: disable=broad-except
+                    budget_fixes_prevu = 3422.0
+
+                import calendar
+                now = _dt.now()
+                avancement_mois = (
+                    now.day / calendar.monthrange(now.year, now.month)[1]
+                ) * 100.0
+                couleur_barre_variables = "#28a745"
+                if reste < 0:
+                    couleur_barre_variables = "#dc3545"
+                elif pct > avancement_mois + 10:
+                    couleur_barre_variables = "#fd7e14"
+
+                pourcentage_fixes = (
+                    (total_fixes / budget_fixes_prevu * 100)
+                    if budget_fixes_prevu > 0
+                    else 0
+                )
+                couleur_barre_fixes = "#28a745"
+                if pourcentage_fixes > 100:
+                    couleur_barre_fixes = "#dc3545"
+                elif pourcentage_fixes > 90:
+                    couleur_barre_fixes = "#fd7e14"
+
+                html_body = template.render(
+                    report_date=getattr(report_index, "report_date", ""),
+                    total_variables=total_depenses,
+                    total_fixes=total_fixes,
+                    budget_max=budget_max,
+                    budget_fixes_prevu=int(budget_fixes_prevu),
+                    reste=reste,
+                    pourcentage=pct,
+                    pourcentage_fixes=pourcentage_fixes,
+                    couleur_barre_variables=couleur_barre_variables,
+                    couleur_barre_fixes=couleur_barre_fixes,
+                    families=getattr(report_index, "families", []),
+                    grand_total=getattr(report_index, "grand_total", 0),
+                    index_url=index_url,
+                )
+            else:
+                # Formateur HTML si dispo
+                try:
+                    from report_formatter_v2 import formater_email_html_v2  # type: ignore
+                    html_body = formater_email_html_v2(analysis_result, budget_max, None)
+                except Exception:  # pylint: disable=broad-except
+                    html_body = None
+        except Exception:  # pylint: disable=broad-except
+            html_body = None
+
+        csv_path = analysis_result.get("csv_path")
+        attachments = [csv_path] if isinstance(csv_path, (str, Path)) else None
+
+        sms_ok = self.send_sms_ovh(sms_msg) if sms_msg else False
+        email_ok = self.send_email(
+            subject=subject,
+            body_text=(
+                html_body
+                or f"Budget variables: {total_depenses:.0f}€ / "
+                f"{budget_max:.0f}€ (reste {reste:.0f}€)"
+            ),
+            html_body=html_body,
+            attachments=attachments,
+        )
+
+        return {"email": email_ok, "sms": sms_ok}
+
+    def send_technical_alert(
+        self,
+        error_type: str,
+        error_message: str,
+        alert_email: str = "phiperez@gmail.com",
+    ) -> bool:
+        """
+        Envoie une alerte technique en cas de problème avec le système.
+
+        Args:
+            error_type: Type d'erreur (ex: "CSV non téléchargé", "Erreur d'analyse")
+            error_message: Message détaillé de l'erreur
+            alert_email: Email de destination pour l'alerte (par défaut phiperez@gmail.com)
+
+        Returns:
+            bool: True si l'alerte a été envoyée
+        """
+        from datetime import datetime as _dt
+
+        subject = f"🔴 ALERTE TECHNIQUE - Linxo Agent - {error_type}"
+
+        body_text = f"""ALERTE TECHNIQUE - LINXO AGENT
+{'=' * 80}
+
+Type d'erreur: {error_type}
+Date/Heure: {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+{'=' * 80}
+DESCRIPTION DE L'ERREUR
+{'=' * 80}
+
+{error_message}
+
+{'=' * 80}
+ACTION REQUISE
+{'=' * 80}
+
+Le système Linxo Agent nécessite une intervention technique.
+Veuillez vérifier les logs et corriger le problème dès que possible.
+
+Pour diagnostiquer:
+1. Connectez-vous au VPS
+2. Consultez les logs: ~/LINXO/logs/daily_report_*.log
+3. Vérifiez que le téléchargement CSV fonctionne
+4. Testez manuellement: python linxo_agent/run_analysis.py
+
+---
+Cette alerte a été générée automatiquement par Linxo Agent
+"""
+
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .alert-box {{
+            background-color: #fee;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+        }}
+        .error-type {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 10px;
+        }}
+        .datetime {{
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }}
+        .error-message {{
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }}
+        .action-required {{
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }}
+        .steps {{
+            margin-left: 20px;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #666;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="alert-box">
+        <div class="error-type">🔴 ALERTE TECHNIQUE - LINXO AGENT</div>
+        <div class="datetime">Date/Heure: {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+    </div>
+
+    <h2>Type d'erreur</h2>
+    <p><strong>{error_type}</strong></p>
+
+    <h2>Description de l'erreur</h2>
+    <div class="error-message">{error_message}</div>
+
+    <div class="action-required">
+        <h2>⚠️ Action requise</h2>
+        <p>Le système Linxo Agent nécessite une intervention technique.</p>
+        <p><strong>Pour diagnostiquer:</strong></p>
+        <ol class="steps">
+            <li>Connectez-vous au VPS</li>
+            <li>Consultez les logs: <code>~/LINXO/logs/daily_report_*.log</code></li>
+            <li>Vérifiez que le téléchargement CSV fonctionne</li>
+            <li>Testez manuellement: <code>python linxo_agent/run_analysis.py</code></li>
+        </ol>
+    </div>
+
+    <div class="footer">
+        Cette alerte a été générée automatiquement par Linxo Agent
+    </div>
+</body>
+</html>"""
+
+        try:
+            result = self.send_email(
+                subject=subject,
+                body_text=body_text,
+                html_body=html_body,
+                recipients=[alert_email],
+            )
+
+            if result:
+                LOGGER.info("Alerte technique envoyée à %s", alert_email)
+            else:
+                LOGGER.error("Échec de l'envoi de l'alerte technique à %s", alert_email)
+
+            return result
+
+        except Exception as exc:  # pylint: disable=broad-except
+            LOGGER.exception("Erreur lors de l'envoi de l'alerte technique: %s", exc)
+            return False
+
+
+# ---------------------------------------------------------------------------
+# Script de test manuel
+# ---------------------------------------------------------------------------
+
+def _example_usage() -> None:
+    """Exemple d'utilisation locale, sans dépendre de l'appli principale."""
+    cfg = load_notification_config()
+    manager = NotificationManager(cfg)
+
+    LOGGER.info("Config email: %s", bool(cfg.emails))
+    LOGGER.info("Config OVH SMS: %s", bool(cfg.ovh_sms))
+
+    if cfg.emails:
+        LOGGER.info("Envoi email de test…")
+        ok = manager.send_email(
+            subject="[Linxo Agent] Test notifications",
+            body_text="Ceci est un test d'email envoyé par le module notifications.",
+        )
+        LOGGER.info("Email test: %s", "OK" if ok else "ECHEC")
+
+    if cfg.ovh_sms:
+        LOGGER.info("Envoi SMS de test…")
+        ok = manager.send_sms_ovh("Test Linxo Agent — tout roule ?")
+        LOGGER.info("SMS test: %s", "OK" if ok else "ECHEC")
+
+
 if __name__ == "__main__":
-    print("\n" + "=" * 80)
-    print("TEST DU MODULE DE NOTIFICATIONS")
-    print("=" * 80)
-
-    manager = NotificationManager()
-
-    # Afficher la configuration
-    print(f"\nEmail SMTP: {manager.config.smtp_email}")
-    print(f"Destinataires email: {manager.config.notification_emails}")
-    print(f"Destinataires SMS: {manager.config.sms_recipients}")
-
-    # Test email
-    print("\n" + "=" * 80)
-    response = input("\nEnvoyer un email de test? (o/n): ")
-    if response.lower() == 'o':
-        subject = "Test Agent Linxo"
-        body = "Ceci est un email de test depuis le module de notifications unifie.\n\nSi vous recevez ce message, la configuration fonctionne correctement!"
-
-        success = manager.send_email(subject, body)
-        if success:
-            print("\n[SUCCESS] Email de test envoye!")
-        else:
-            print("\n[ERREUR] Echec de l'envoi de l'email de test")
-
-    # Test SMS
-    print("\n" + "=" * 80)
-    response = input("\nEnvoyer un SMS de test? (o/n): ")
-    if response.lower() == 'o':
-        message = "Test Agent Linxo: Si vous recevez ce SMS, la configuration fonctionne!"
-
-        results = manager.send_sms_ovh(message)
-        if any(results.values()):
-            print("\n[SUCCESS] Au moins un SMS de test envoye!")
-        else:
-            print("\n[ERREUR] Echec de l'envoi des SMS de test")
-
-    print("\n" + "=" * 80)
-    print("Test termine")
-    print("=" * 80)
+    _example_usage()

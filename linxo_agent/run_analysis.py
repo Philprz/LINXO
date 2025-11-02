@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Linxo Analysis Runner - Version moderne avec emails HTML
-Utilise le système d'analyse moderne avec notifications HTML épurées
+Linxo Analysis Runner - Version moderne avec rapports HTML complets
+Utilise le système d'analyse moderne avec génération de rapports HTML par famille
 """
 
 import sys
 import os
 from pathlib import Path
 from datetime import datetime
+import pandas as pd
 
 # Add the linxo_agent directory to path
 linxo_agent_dir = Path(__file__).parent
 sys.path.insert(0, str(linxo_agent_dir))
 
 # Import des modules modernes
-from analyzer import analyser_csv
+from analyzer import analyser_csv, lire_csv_linxo
 from notifications import NotificationManager
 from config import get_config
+from reports import build_daily_report
 
 def main():
-    """Exécute l'analyse avec notifications modernes (emails HTML)"""
+    """Exécute l'analyse avec génération de rapports HTML et notifications"""
     print("\n" + "=" * 80)
-    print("LINXO AGENT - ANALYSE AVEC NOTIFICATIONS HTML")
+    print("LINXO AGENT - ANALYSE AVEC RAPPORTS HTML COMPLETS")
     print("=" * 80)
     print(f"Demarrage: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
@@ -39,8 +41,57 @@ def main():
             sys.exit(1)
         print(f"Utilisation du fichier: {csv_file}")
     else:
-        # Use default CSV file
-        csv_file = config.get_latest_csv()
+        # Use default CSV file with duplicate check
+        csv_file = config.get_latest_csv(check_already_sent=True)
+
+        if csv_file is None:
+            print("\n" + "=" * 80)
+            print("AUCUN NOUVEAU FICHIER A TRAITER")
+            print("=" * 80)
+            print("Le dernier fichier CSV a deja ete envoye aujourd'hui.")
+            print("Aucune action necessaire.")
+            print("=" * 80)
+            sys.exit(0)
+
+        if not csv_file or not Path(csv_file).exists():
+            print("\n" + "=" * 80)
+            print("ERREUR: AUCUN FICHIER CSV DISPONIBLE")
+            print("=" * 80)
+            print("Aucun fichier CSV n'a ete trouve dans les repertoires de donnees.")
+            print("Le telechargement automatique a probablement echoue.")
+            print("=" * 80)
+
+            # Envoyer une alerte technique
+            try:
+                notification_manager = NotificationManager()
+                error_msg = f"""Le système n'a trouvé aucun fichier CSV à traiter.
+
+Répertoires vérifiés:
+- {config.data_dir}
+- {config.downloads_dir}
+
+Causes possibles:
+1. Le téléchargement automatique depuis Linxo a échoué
+2. Problème de connexion au site Linxo
+3. Changement de l'interface Linxo nécessitant une mise à jour du scraper
+4. Problème d'authentification (identifiants expirés ou 2FA non géré)
+
+Logs à consulter:
+- Derniers logs cron: ~/LINXO/logs/daily_report_*.log
+- Logs de téléchargement si disponibles
+
+Action immédiate requise pour rétablir le service.
+"""
+                notification_manager.send_technical_alert(
+                    error_type="Aucun fichier CSV disponible",
+                    error_message=error_msg
+                )
+                print("\n[ALERTE] Email d'alerte technique envoye a phiperez@gmail.com")
+            except Exception as e:
+                print(f"\n[ERREUR] Impossible d'envoyer l'alerte technique: {e}")
+
+            sys.exit(1)
+
         print(f"Utilisation du dernier CSV: {csv_file}")
 
     # ETAPE 1: Analyse des depenses
@@ -53,6 +104,33 @@ def main():
 
         if not analysis_result:
             print("ERREUR: Echec de l'analyse")
+
+            # Envoyer une alerte technique
+            try:
+                notification_manager = NotificationManager()
+                error_msg = f"""L'analyse du fichier CSV a échoué.
+
+Fichier analysé: {csv_file}
+
+Causes possibles:
+1. Format du fichier CSV invalide ou corrompu
+2. Colonnes manquantes dans l'export Linxo
+3. Encodage du fichier incorrect
+4. Fichier vide ou incomplet
+
+Logs à consulter:
+- ~/LINXO/logs/daily_report_*.log
+
+Vérifiez manuellement le contenu du fichier CSV.
+"""
+                notification_manager.send_technical_alert(
+                    error_type="Échec d'analyse du CSV",
+                    error_message=error_msg
+                )
+                print("\n[ALERTE] Email d'alerte technique envoye a phiperez@gmail.com")
+            except Exception as alert_error:
+                print(f"\n[ERREUR] Impossible d'envoyer l'alerte technique: {alert_error}")
+
             sys.exit(1)
 
         print("\nAnalyse terminee!")
@@ -68,30 +146,145 @@ def main():
     except Exception as e:
         print(f"ERREUR durant l'analyse: {e}")
         import traceback
+        error_traceback = traceback.format_exc()
         traceback.print_exc()
+
+        # Envoyer une alerte technique avec la stacktrace
+        try:
+            notification_manager = NotificationManager()
+            error_msg = f"""Une erreur inattendue s'est produite lors de l'analyse.
+
+Fichier analysé: {csv_file}
+
+Erreur: {str(e)}
+
+Stacktrace complète:
+{error_traceback}
+
+Logs à consulter:
+- ~/LINXO/logs/daily_report_*.log
+
+Une intervention technique est nécessaire pour corriger ce problème.
+"""
+            notification_manager.send_technical_alert(
+                error_type="Erreur inattendue lors de l'analyse",
+                error_message=error_msg
+            )
+            print("\n[ALERTE] Email d'alerte technique envoye a phiperez@gmail.com")
+        except Exception as alert_error:
+            print(f"\n[ERREUR] Impossible d'envoyer l'alerte technique: {alert_error}")
+
         sys.exit(1)
 
-    # ETAPE 2: Envoi des notifications (email HTML + SMS)
+    # ETAPE 2: Generation des rapports HTML par famille
     print("\n" + "=" * 80)
-    print("ETAPE 2: ENVOI DES NOTIFICATIONS (EMAIL HTML + SMS)")
+    print("ETAPE 2: GENERATION DES RAPPORTS HTML PAR FAMILLE")
+    print("=" * 80)
+
+    report_index = None
+    try:
+        # Lire le CSV avec la fonction qui ajoute la colonne 'famille'
+        transactions, exclus = lire_csv_linxo(csv_file)
+
+        # Convertir en DataFrame pour build_daily_report
+        df_data = []
+        for t in transactions:
+            df_data.append({
+                'date': t.get('date_str', ''),
+                'date_str': t.get('date_str', ''),
+                'libelle': t.get('libelle', ''),
+                'montant': t.get('montant', 0.0),
+                'categorie': t.get('categorie', 'Non classe'),
+                'compte': t.get('compte', ''),
+            })
+
+        df = pd.DataFrame(df_data)
+
+        # Récupérer les variables d'environnement pour les rapports
+        base_url = os.getenv('REPORTS_BASE_URL')
+        signing_key = os.getenv('REPORTS_SIGNING_KEY')
+
+        if not base_url:
+            print("[WARN] REPORTS_BASE_URL non defini, rapports generes sans URLs")
+            base_url = "http://localhost"
+
+        # Générer les rapports HTML
+        report_date = datetime.now().strftime('%Y-%m-%d')
+        report_index = build_daily_report(
+            df=df,
+            report_date=report_date,
+            base_url=base_url,
+            signing_key=signing_key
+        )
+
+        print(f"\nRapports HTML generes!")
+        print(f"  Repertoire: {report_index.base_dir}")
+        print(f"  Familles: {len(report_index.families)}")
+        print(f"  Total depenses: {report_index.grand_total:.2f}E")
+        print(f"  URL index: {base_url}/reports/{report_date}/index.html")
+
+    except Exception as e:
+        print(f"WARNING: Erreur lors de la generation des rapports HTML: {e}")
+        import traceback
+        traceback.print_exc()
+        print("Poursuite avec les notifications...")
+
+    # ETAPE 3: Envoi des notifications (email HTML + SMS)
+    print("\n" + "=" * 80)
+    print("ETAPE 3: ENVOI DES NOTIFICATIONS (EMAIL HTML + SMS)")
     print("=" * 80)
 
     try:
         notification_manager = NotificationManager()
-        notif_results = notification_manager.send_budget_notification(analysis_result)
+        notif_results = notification_manager.send_budget_notification(
+            analysis_result,
+            report_index=report_index
+        )
 
         # Verifier les resultats
-        sms_results = notif_results.get('sms', {})
-        sms_ok = any(sms_results.values())
+        sms_ok = notif_results.get('sms', False)
         email_ok = notif_results.get('email', False)
 
         if sms_ok or email_ok:
             print("\nNotifications envoyees!")
             print(f"  Email HTML: {'OK' if email_ok else 'ECHEC'}")
-            sms_sent = sum(sms_results.values())
-            print(f"  SMS: {sms_sent} / {len(sms_results)}")
+            print(f"  SMS: {'OK' if sms_ok else 'ECHEC'}")
+
+            # Marquer le fichier comme envoyé
+            config.mark_csv_as_sent(Path(csv_file))
         else:
             print("WARNING: Aucune notification n'a pu etre envoyee")
+
+            # Envoyer une alerte technique
+            try:
+                error_msg = f"""L'envoi des notifications a échoué (email ET SMS).
+
+Fichier analysé: {csv_file}
+Date du rapport: {datetime.now().strftime('%Y-%m-%d')}
+
+Résultats de l'analyse:
+- Dépenses variables: {analysis_result['total_variables']:.2f}€
+- Budget: {analysis_result['budget_max']:.2f}€
+- Reste: {analysis_result['reste']:.2f}€
+
+Causes possibles:
+1. Problème de configuration SMTP
+2. Identifiants email expirés ou invalides
+3. Problème de configuration OVH SMS
+4. Problème de connectivité réseau
+
+Logs à consulter:
+- ~/LINXO/logs/daily_report_*.log
+
+Action requise: Vérifier la configuration des emails et SMS.
+"""
+                notification_manager.send_technical_alert(
+                    error_type="Échec d'envoi des notifications",
+                    error_message=error_msg
+                )
+                print("\n[ALERTE] Email d'alerte technique envoye a phiperez@gmail.com")
+            except Exception as alert_error:
+                print(f"\n[ERREUR] Impossible d'envoyer l'alerte technique: {alert_error}")
 
     except Exception as e:
         print(f"ERREUR durant l'envoi des notifications: {e}")
@@ -99,9 +292,9 @@ def main():
         traceback.print_exc()
         # Ne pas quitter avec erreur, l'analyse a reussi
 
-    # ETAPE 3: Sauvegarder le rapport
+    # ETAPE 4: Sauvegarder le rapport texte
     print("\n" + "=" * 80)
-    print("ETAPE 3: SAUVEGARDE DU RAPPORT")
+    print("ETAPE 4: SAUVEGARDE DU RAPPORT TEXTE")
     print("=" * 80)
 
     try:

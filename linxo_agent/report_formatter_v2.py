@@ -41,7 +41,7 @@ def formater_sms_v2(total_depenses, budget_max, reste, pourcentage):
         message += f"💰 {total_depenses:.0f}€ / {budget_max:.0f}€\n"
         message += f"⚠️ +{abs(reste):.0f}€ de dépassement\n"
         message += f"📅 J{jour_actuel}/{dernier_jour}\n"
-        message += f"💡 Limiter au strict nécessaire"
+        message += "💡 Limiter au strict nécessaire"
     elif pourcentage >= 80:
         budget_jour = reste / jours_restants if jours_restants > 0 else 0
         message = f"{emoji} Budget : {total_depenses:.0f}€/{budget_max:.0f}€\n"
@@ -66,7 +66,8 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
         analyse: Résultat de l'analyse
         budget_max: Budget maximum pour variables
         conseil: Conseil généré
-        budget_fixes_prevu: Budget prévu pour les frais fixes (calculé depuis depenses_fixes si None)
+        budget_fixes_prevu: Budget prévu pour les frais fixes
+                           (calculé depuis depenses_fixes si None)
 
     Returns:
         str: HTML formaté
@@ -84,17 +85,17 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
     if budget_fixes_prevu is None:
         # Lire depuis la config
         try:
-            from config import get_config
+            from config import get_config  # type: ignore
             config = get_config()
             depenses_fixes_ref = config.depenses_data.get('depenses_fixes', [])
             budget_fixes_prevu = sum(d.get('montant', 0) for d in depenses_fixes_ref)
-        except:
+        except Exception:  # pylint: disable=broad-except
             budget_fixes_prevu = 3422  # Fallback
 
     pourcentage_fixes = (total_fixes / budget_fixes_prevu * 100) if budget_fixes_prevu > 0 else 0
 
     # Calcul de l'avancement théorique du mois
-    avancement_mois = (jour_actuel / dernier_jour * 100)
+    avancement_mois = jour_actuel / dernier_jour * 100
     depense_theorique_pct = avancement_mois  # On devrait avoir dépensé X% du budget
 
     # Couleur pour les dépenses variables selon le statut
@@ -330,7 +331,8 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
 
             <div class="progress-section">
                 <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: {pourcentage_fixes:.1f}%; background: linear-gradient(90deg, {couleur_barre_fixes} 0%, {couleur_barre_fixes}dd 100%);">
+                    <div class="progress-bar-fill" style="width: {pourcentage_fixes:.1f}%; \
+background: linear-gradient(90deg, {couleur_barre_fixes} 0%, {couleur_barre_fixes}dd 100%);">
                         {pourcentage_fixes:.0f}%
                     </div>
                     <div class="progress-marker-100"></div>
@@ -345,7 +347,10 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
 
             <div class="progress-section">
                 <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: {pourcentage:.1f}%; background: linear-gradient(90deg, {couleur_barre_variables} 0%, {couleur_barre_variables}dd 100%);">
+                    <div class="progress-bar-fill" \
+style="width: {pourcentage:.1f}%; \
+background: linear-gradient(90deg, {couleur_barre_variables} 0%, \
+{couleur_barre_variables}dd 100%);">
                         {pourcentage:.0f}%
                     </div>
                     <div class="progress-marker-100"></div>
@@ -353,7 +358,8 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
             </div>
 
             <div class="metric" style="margin-top: 15px;">
-                <span class="metric-label">{"Dépassement" if reste < 0 else "Reste disponible"}</span>
+                <span class="metric-label">\
+{'Dépassement' if reste < 0 else 'Reste disponible'}</span>
                 <span class="metric-value value-green">{abs(reste):.2f} €</span>
             </div>
 
@@ -387,7 +393,9 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
 """.format(len(analyse['depenses_fixes']))
 
     # Trier les dépenses fixes par montant décroissant
-    depenses_fixes_triees = sorted(analyse['depenses_fixes'], key=lambda x: abs(x['montant']), reverse=True)
+    depenses_fixes_triees = sorted(
+        analyse['depenses_fixes'], key=lambda x: abs(x['montant']), reverse=True
+    )
 
     # Ajouter toutes les dépenses fixes triées dans le tableau
     for dep in depenses_fixes_triees:
@@ -427,8 +435,10 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
                     <tbody>
 """.format(len(analyse['depenses_variables']))
 
-    # Trier les dépenses variables par montant décroissant (plus important en premier)
-    depenses_triees = sorted(analyse['depenses_variables'], key=lambda x: abs(x['montant']), reverse=True)
+    # Trier les dépenses variables par montant décroissant
+    depenses_triees = sorted(
+        analyse['depenses_variables'], key=lambda x: abs(x['montant']), reverse=True
+    )
 
     # Ajouter toutes les transactions variables triées dans le tableau
     for dep in depenses_triees:
