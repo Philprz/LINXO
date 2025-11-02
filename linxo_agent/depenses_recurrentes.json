@@ -245,7 +245,7 @@
       "compte": "Boursobank",
       "identifiant": "Cath",
       "commentaire": "AssuranceVie Gestion Rotschild",
-      "montant": 200.0,
+      "montant": 100.0,
       "categorie": "Epargne"
     },
     {
@@ -253,11 +253,11 @@
       "compte": "Boursobank",
       "identifiant": "Phil",
       "commentaire": "AssuranceVie Gestion Rotschild",
-      "montant": 400.0,
+      "montant": 200.0,
       "categorie": "Epargne"
     }
   ],
-  "depenses_variables": [1403],
+  "depenses_variables": [1700],
   "revenus": [
     {
       "libelle": "SGC CALUIRE",
