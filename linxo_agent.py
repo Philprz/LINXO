@@ -269,15 +269,13 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                 )
 
                 # Vérifier les résultats
-                sms_results = notif_results.get('sms', {})
-                sms_ok = any(sms_results.values())
+                sms_ok = notif_results.get('sms', False)
                 email_ok = notif_results.get('email', False)
 
                 if sms_ok or email_ok:
                     print("\n[SUCCESS] Notifications envoyees!")
                     print(f"  Email: {'OK' if email_ok else 'ECHEC'}")
-                    sms_sent = sum(sms_results.values())
-                    print(f"  SMS: {sms_sent} / {len(sms_results)}")
+                    print(f"  SMS: {'OK' if sms_ok else 'ECHEC'}")
                     results['notification_success'] = True
                 else:
                     print("[WARNING] Aucune notification n'a pu etre envoyee")
