@@ -190,41 +190,32 @@ def load_notification_config() -> NotificationConfig:
 
     # Email
     email_settings: Optional[EmailSettings] = None
-    smtp_host = _get(cfg, "smtp_host", "") or os.getenv("SMTP_HOST", "")
-    smtp_sender = _get(cfg, "smtp_sender", "") or os.getenv("SMTP_SENDER", "")
-    if smtp_host and smtp_sender:
+    smtp_host = _get(cfg, "smtp_server", "") or os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_sender = _get(cfg, "smtp_email", "") or os.getenv("SMTP_SENDER", "")
+    if smtp_sender:
         email_settings = EmailSettings(
             host=str(smtp_host),
-            port=int(_get(cfg, "smtp_port", os.getenv("SMTP_PORT") or 465)),
-            username=str(_get(cfg, "smtp_username", os.getenv("SMTP_USER", ""))),
-            password=str(_get(cfg, "smtp_password", os.getenv("SMTP_PASSWORD", ""))),
+            port=int(_get(cfg, "smtp_port", 587)),
+            username=str(smtp_sender),
+            password=str(_get(cfg, "smtp_password", "")),
             sender=str(smtp_sender),
-            use_ssl=bool(_get(cfg, "smtp_use_ssl", _env_bool("SMTP_USE_SSL", True))),
-            use_starttls=bool(
-                _get(cfg, "smtp_use_starttls", _env_bool("SMTP_USE_STARTTLS", False))
-            ),
-            default_recipients=tuple(
-                _to_list(str(_get(cfg, "notification_emails", os.getenv("NOTIFICATION_EMAILS") or "")))
-            ),
+            use_ssl=False,
+            use_starttls=True,
+            default_recipients=tuple(_get(cfg, "notification_emails", [])),
         )
 
     # OVH SMS
     ovh_settings: Optional[OvhSmsSettings] = None
-    ovh_endpoint = str(_get(cfg, "ovh_endpoint", os.getenv("OVH_ENDPOINT", "")))
-    ovh_app_key = str(_get(cfg, "ovh_application_key", os.getenv("OVH_APP_KEY", "")))
-    if ovh_endpoint and ovh_app_key:
+    ovh_account = str(_get(cfg, "ovh_service_name", ""))
+    if ovh_account:
         ovh_settings = OvhSmsSettings(
-            endpoint=ovh_endpoint or "ovh-eu",
-            application_key=ovh_app_key,
-            application_secret=str(
-                _get(cfg, "ovh_application_secret", os.getenv("OVH_APP_SECRET", ""))
-            ),
-            consumer_key=str(_get(cfg, "ovh_consumer_key", os.getenv("OVH_CONSUMER_KEY", ""))),
-            account=str(_get(cfg, "ovh_sms_account", os.getenv("OVH_SMS_ACCOUNT", ""))),
-            sender=str(_get(cfg, "ovh_sms_sender", os.getenv("OVH_SMS_SENDER", ""))),
-            default_recipients=tuple(
-                _to_list(str(_get(cfg, "notification_sms_recipients", os.getenv("OVH_SMS_RECIPIENTS") or "")))
-            ),
+            endpoint="ovh-eu",
+            application_key=ovh_account,
+            application_secret=str(_get(cfg, "ovh_app_secret", "")),
+            consumer_key="",  # Pas utilisé dans votre config
+            account=ovh_account,
+            sender=str(_get(cfg, "sms_sender", "PhiPEREZ")),
+            default_recipients=tuple(_get(cfg, "sms_recipients", [])),
         )
 
     return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings)
