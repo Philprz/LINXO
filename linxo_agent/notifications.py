@@ -18,7 +18,6 @@ ou les formateurs ne sont pas installés (fallback texte).
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -29,7 +28,7 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -204,17 +203,17 @@ def load_notification_config() -> NotificationConfig:
             default_recipients=tuple(_get(cfg, "notification_emails", [])),
         )
 
-    # OVH SMS
+    # OVH SMS (méthode email-to-SMS)
     ovh_settings: Optional[OvhSmsSettings] = None
-    ovh_account = str(_get(cfg, "ovh_service_name", ""))
+    ovh_account = str(_get(cfg, "ovh_compte_sms", "") or _get(cfg, "ovh_service_name", ""))
     if ovh_account:
         ovh_settings = OvhSmsSettings(
             endpoint="ovh-eu",
-            application_key=ovh_account,
-            application_secret=str(_get(cfg, "ovh_app_secret", "")),
-            consumer_key="",  # Pas utilisé dans votre config
+            application_key=ovh_account,  # Utilisé comme compte SMS
+            application_secret=str(_get(cfg, "ovh_mot_de_passe_sms", "") or _get(cfg, "ovh_app_secret", "")),
+            consumer_key="",  # Non utilisé pour email-to-SMS
             account=ovh_account,
-            sender=str(_get(cfg, "sms_sender", "PhiPEREZ")),
+            sender=str(_get(cfg, "ovh_expediteur_sms", "") or _get(cfg, "sms_sender", "PhiPEREZ")),
             default_recipients=tuple(_get(cfg, "sms_recipients", [])),
         )
 
@@ -372,100 +371,77 @@ class NotificationManager:
         no_stop_clause: bool = False,
     ) -> bool:
         """
-        Envoie un SMS via OVH.
+        Envoie un SMS via OVH (méthode email-to-SMS).
 
         Notes
         -----
-        - Requiert le package `requests`. Si absent, logge un avertissement et échoue.
-        - Le message est automatiquement tronqué à 160 caractères (1 SMS) si
-          l'option de concaténation n'est pas activée côté compte OVH.
+        - Utilise la méthode email2sms@ovh.net
+        - Le message est automatiquement tronqué à 160 caractères
+        - Format du sujet: compte:utilisateur:password:expediteur:destinataire
         """
         if self._config.ovh_sms is None:
             LOGGER.error("Configuration OVH SMS indisponible.")
             return False
 
-        try:
-            import requests  # type: ignore
-        except Exception:  # pylint: disable=broad-except
-            LOGGER.error("Le package 'requests' est requis pour OVH SMS.")
+        if self._config.emails is None:
+            LOGGER.error("Configuration email requise pour l'envoi SMS via OVH.")
             return False
 
         settings = self._config.ovh_sms
+        email_settings = self._config.emails
         to_list = _validate_phones(recipients or settings.default_recipients)
         if not to_list:
             LOGGER.error("Aucun destinataire SMS valide.")
             return False
 
+        # Tronquer le message si nécessaire
         final_message = message.strip()
-        if not no_stop_clause and "STOP" not in final_message.upper():
-            final_message = f"{final_message} STOP au 36180"
-
         if len(final_message) > 160:
-            LOGGER.warning("Message > 160 chars, tronqué pour envoi simple SMS.")
-            final_message = final_message[:160]
+            LOGGER.warning("Message > 160 chars, tronqué.")
+            final_message = final_message[:157] + "..."
 
-        base_url = "https://eu.api.ovh.com/1.0"
-        url = f"{base_url}/sms/{settings.account}/jobs"
+        # Envoyer un SMS à chaque destinataire via email2sms
+        success_count = 0
+        for phone in to_list:
+            try:
+                # Format du sujet pour OVH: compte:utilisateur:password:expediteur:destinataire
+                # Utilise account pour le compte, application_secret pour le password
+                subject = f"{settings.account}:default:{settings.application_secret}:{settings.sender}:{phone}"
 
-        payload: MutableMapping[str, Any] = {
-            "message": final_message,
-            "sender": settings.sender,
-            "receivers": to_list,
-            "noStopClause": no_stop_clause,
-            "priority": "high",
-        }
+                msg = MIMEMultipart()
+                msg["Subject"] = subject
+                msg["From"] = email_settings.sender
+                msg["To"] = "email2sms@ovh.net"
 
-        def _build_ovh_headers(body: MutableMapping[str, Any]) -> Mapping[str, str]:
-            """Construit les headers OVH signés."""
-            import time
-            import hashlib
-            import hmac
+                body = MIMEText(final_message, "plain", "utf-8")
+                msg.attach(body)
 
-            body_str = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
+                LOGGER.info("Envoi SMS via OVH à %s...", phone)
 
-            # Time: utiliser /auth/time (réponse = timestamp epoch)
-            ovh_time = int(requests.get(f"{base_url}/auth/time", timeout=10).text)
+                if email_settings.use_ssl:
+                    context = ssl.create_default_context()
+                    with smtplib.SMTP_SSL(email_settings.host, email_settings.port, context=context) as smtp:
+                        if email_settings.username:
+                            smtp.login(email_settings.username, email_settings.password)
+                        smtp.sendmail(email_settings.sender, "email2sms@ovh.net", msg.as_string())
+                else:
+                    with smtplib.SMTP(email_settings.host, email_settings.port) as smtp:
+                        if email_settings.use_starttls:
+                            context = ssl.create_default_context()
+                            smtp.starttls(context=context)
+                        if email_settings.username:
+                            smtp.login(email_settings.username, email_settings.password)
+                        smtp.sendmail(email_settings.sender, "email2sms@ovh.net", msg.as_string())
 
-            to_sign = "+".join(
-                [
-                    settings.application_secret,
-                    settings.consumer_key,
-                    "POST",
-                    url,
-                    body_str,
-                    str(ovh_time),
-                ]
-            ).encode("utf-8")
+                LOGGER.info("SMS envoyé à %s", phone)
+                success_count += 1
 
-            signature = "$1$" + hmac.new(
-                settings.application_secret.encode("utf-8"),
-                to_sign,
-                hashlib.sha1,
-            ).hexdigest()
+            except smtplib.SMTPException as exc:
+                LOGGER.error("Echec SMS pour %s: %s", phone, exc)
+            except Exception as exc:  # pylint: disable=broad-except
+                LOGGER.error("Erreur inattendue SMS pour %s: %s", phone, exc)
 
-            headers = {
-                "X-Ovh-Application": settings.application_key,
-                "X-Ovh-Consumer": settings.consumer_key,
-                "X-Ovh-Signature": signature,
-                "X-Ovh-Timestamp": str(ovh_time),
-                "Content-type": "application/json; charset=utf-8",
-            }
-            _ = time.time()  # évite lint sur import local
-            return headers
-
-        try:
-            headers = _build_ovh_headers(payload)
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            if response.status_code // 100 != 2:
-                LOGGER.error("Echec OVH SMS (%s): %s", response.status_code, response.text[:500])
-                return False
-
-            LOGGER.info("SMS OVH envoyé à %s", to_list)
-            return True
-
-        except Exception as exc:  # requests.RequestException compatible
-            LOGGER.exception("Echec requête OVH SMS : %s", exc)
-            return False
+        return success_count > 0
 
     # -------------------------- Façades & budget ---------------------------
 
