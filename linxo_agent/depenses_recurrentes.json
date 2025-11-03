@@ -33,14 +33,6 @@
       "categorie": "VOITURE"
     },
     {
-      "libelle": "MOBILIZE",
-      "compte": "LCL",
-      "identifiant": "MOBILIZE",
-      "commentaire": "Loyer Twingo",
-      "montant": 223.0,
-      "categorie": "VOITURE"
-    },
-    {
       "libelle": "DIAC",
       "compte": "LCL",
       "identifiant": "DIAC",
@@ -287,14 +279,15 @@
   "totaux": {
     "credits": 1046.0,
     "voiture": 716.0,
-    "maison": 561,
-    "communication": 42,
-    "assurances": 180,
+    "maison": 561.27,
+    "communication": 41.97,
+    "assurances": 179.97,
     "transport": 197.8,
     "impots": 0.0,
-    "epargne": 600.0,
-    "total_depenses_fixes": 3000,
+    "epargne": 300.0,
+    "frais_bancaires": 5.0,
+    "total_depenses_fixes": 3048.01,
     "total_revenus": 4745.87,
-    "budget_variable_max": 1400
+    "budget_variable_max": 1700
   }
 }

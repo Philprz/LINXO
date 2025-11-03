@@ -96,26 +96,45 @@ class Config:
 
     def _load_depenses_config(self):
         """Charge la configuration des dépenses depuis .env et JSON"""
-        # Budget depuis .env (prioritaire)
-        self.budget_variable = float(os.getenv('BUDGET_VARIABLE', '1300'))
-
         # Charger le fichier depenses_recurrentes.json si disponible
         if self.depenses_file.exists():
             try:
                 with open(self.depenses_file, 'r', encoding='utf-8') as f:
                     self.depenses_data = json.load(f)
 
-                # Utiliser le budget du .env comme référence (écrase le JSON)
+                # Calculer le budget variable depuis le JSON: Revenus - Dépenses Fixes
+                total_revenus = sum(
+                    float(r.get('montant', 0) or 0)
+                    for r in self.depenses_data.get('revenus', [])
+                )
+                total_depenses_fixes = sum(
+                    float(d.get('montant', 0) or 0)
+                    for d in self.depenses_data.get('depenses_fixes', [])
+                )
+                # Arrondir au 100 le plus proche
+                budget_brut = total_revenus - total_depenses_fixes
+                self.budget_variable = round(budget_brut / 100) * 100
+
+                # Mettre à jour les totaux dans le JSON (pour cohérence)
+                if 'totaux' not in self.depenses_data:
+                    self.depenses_data['totaux'] = {}
+                self.depenses_data['totaux']['total_revenus'] = total_revenus
+                self.depenses_data['totaux']['total_depenses_fixes'] = total_depenses_fixes
                 self.depenses_data['totaux']['budget_variable_max'] = self.budget_variable
 
                 depenses_count = len(self.depenses_data.get('depenses_fixes', []))
                 print(f"[OK] Depenses recurrentes chargees: {depenses_count} depenses fixes")
+                print(f"[OK] Budget variable calcule: {self.budget_variable:.2f}€ (Revenus: {total_revenus:.2f}€ - Fixes: {total_depenses_fixes:.2f}€)")
             except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
                 print(f"[WARN] Erreur lors du chargement des depenses: {e}")
+                # Fallback: utiliser .env si le JSON échoue
+                self.budget_variable = float(os.getenv('BUDGET_VARIABLE', '1300'))
                 self.depenses_data = {'depenses_fixes': [],
                                       'totaux': {'budget_variable_max': self.budget_variable}}
         else:
             print(f"[WARN] Fichier depenses_recurrentes.json non trouve: {self.depenses_file}")
+            # Fallback: utiliser .env si le JSON n'existe pas
+            self.budget_variable = float(os.getenv('BUDGET_VARIABLE', '1300'))
             self.depenses_data = {'depenses_fixes': [],
                                   'totaux': {'budget_variable_max': self.budget_variable}}
 

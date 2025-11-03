@@ -103,6 +103,7 @@ class OvhSmsSettings:
     application_secret: str
     consumer_key: str
     account: str  # ex: "sms-xxxxxx-1"
+    user: str  # ex: "sms-xxxxxx-1" (OVH_SERVICE_NAME)
     sender: str  # ex: "ITSPIRIT"
     default_recipients: Tuple[str, ...] = field(default_factory=tuple)
 
@@ -205,14 +206,16 @@ def load_notification_config() -> NotificationConfig:
 
     # OVH SMS (méthode email-to-SMS)
     ovh_settings: Optional[OvhSmsSettings] = None
-    ovh_account = str(_get(cfg, "ovh_compte_sms", "") or _get(cfg, "ovh_service_name", ""))
+    ovh_account = str(_get(cfg, "ovh_compte_sms", "") or _get(cfg, "ovh_user_api", ""))
+    ovh_service_name = str(_get(cfg, "ovh_service_name", ""))
     if ovh_account:
         ovh_settings = OvhSmsSettings(
             endpoint="ovh-eu",
-            application_key=ovh_account,  # Utilisé comme compte SMS
+            application_key=ovh_account,  # OVH_USER_API
             application_secret=str(_get(cfg, "ovh_mot_de_passe_sms", "") or _get(cfg, "ovh_app_secret", "")),
             consumer_key="",  # Non utilisé pour email-to-SMS
-            account=ovh_account,
+            account=ovh_account,  # OVH_USER_API (premier champ)
+            user=ovh_service_name,  # OVH_SERVICE_NAME (deuxième champ)
             sender=str(_get(cfg, "ovh_expediteur_sms", "") or _get(cfg, "sms_sender", "PhiPEREZ")),
             default_recipients=tuple(_get(cfg, "sms_recipients", [])),
         )
@@ -405,8 +408,8 @@ class NotificationManager:
         for phone in to_list:
             try:
                 # Format du sujet pour OVH: compte:utilisateur:password:expediteur:destinataire
-                # Utilise account pour le compte, application_secret pour le password
-                subject = f"{settings.account}:default:{settings.application_secret}:{settings.sender}:{phone}"
+                # OVH_USER_API:OVH_SERVICE_NAME:OVH_APP_SECRET:SMS_SENDER:SMS_RECIPIENT
+                subject = f"{settings.account}:{settings.user}:{settings.application_secret}:{settings.sender}:{phone}"
 
                 msg = MIMEMultipart()
                 msg["Subject"] = subject
@@ -567,7 +570,7 @@ class NotificationManager:
                         for d in depenses_fixes_ref
                     )
                 except Exception:  # pylint: disable=broad-except
-                    budget_fixes_prevu = 3422.0
+                    budget_fixes_prevu = 3271.0  # Fallback (mise à jour 2025)
 
                 import calendar
                 now = _dt.now()

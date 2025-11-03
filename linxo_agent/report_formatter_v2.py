@@ -90,7 +90,7 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
             depenses_fixes_ref = config.depenses_data.get('depenses_fixes', [])
             budget_fixes_prevu = sum(d.get('montant', 0) for d in depenses_fixes_ref)
         except Exception:  # pylint: disable=broad-except
-            budget_fixes_prevu = 3422  # Fallback
+            budget_fixes_prevu = 3271  # Fallback (mise à jour 2025)
 
     pourcentage_fixes = (total_fixes / budget_fixes_prevu * 100) if budget_fixes_prevu > 0 else 0
 
