@@ -3,7 +3,7 @@
 
 set -e
 
-VPS_HOST="ubuntu@152.228.218.1"
+VPS_HOST="linxo@152.228.218.1"
 NEW_HOUR="10"
 
 echo "========================================="
@@ -35,8 +35,8 @@ if grep -q "run_linxo_e2e.py" /tmp/current_cron || grep -q "run_daily_report" /t
     echo "Cron Linxo trouvé, modification en cours..."
 
     # Remplacer l'heure dans le cron (change "0 XX" en "0 10")
-    sed -i 's/^0 [0-9]\+ \* \* \* .*LINXO/0 ${NEW_HOUR} * * * cd \/home\/ubuntu\/LINXO \&\& \/home\/ubuntu\/LINXO\/venv\/bin\/python3 run_linxo_e2e.py >> logs\/cron.log 2>\&1/g' /tmp/current_cron
-    sed -i 's/^0 [0-9]\+ \* \* \* .*run_daily_report/0 ${NEW_HOUR} * * * \/home\/ubuntu\/LINXO\/run_daily_report.sh/g' /tmp/current_cron
+    sed -i 's/^0 [0-9]\+ \* \* \* .*LINXO/0 ${NEW_HOUR} * * * cd \/home\/linxo\/LINXO \&\& \/home\/linxo\/LINXO\/venv\/bin\/python3 run_linxo_e2e.py >> logs\/cron.log 2>\&1/g' /tmp/current_cron
+    sed -i 's/^0 [0-9]\+ \* \* \* .*run_daily_report/0 ${NEW_HOUR} * * * \/home\/linxo\/LINXO\/run_daily_report.sh/g' /tmp/current_cron
 
     # Réinstaller le cron modifié
     crontab /tmp/current_cron
