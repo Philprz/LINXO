@@ -344,7 +344,7 @@ def build_daily_report(
         file_name = f"family-{slug}.html"
         file_path = base_dir / file_name
 
-        relative_url = f"/reports/{report_date_str}/{file_name}"
+        relative_url = f"/{report_date_str}/{file_name}"
         full_url = f"{base_url.rstrip('/')}{relative_url}"
 
         if signing_key:
@@ -467,7 +467,7 @@ def build_daily_report(
 
     # Générer la page index
     index_template = env.get_template("index.html.j2")
-    index_relative_url = f"/reports/{report_date_str}/index.html"
+    index_relative_url = f"/{report_date_str}/index.html"
     index_url = f"{base_url.rstrip('/')}{index_relative_url}"
     if signing_key:
         token = generate_token(index_relative_url, signing_key)
