@@ -208,13 +208,22 @@ Une intervention technique est nécessaire pour corriger ce problème.
             print("[WARN] REPORTS_BASE_URL non defini, rapports generes sans URLs")
             base_url = "http://localhost"
 
+        # Générer le conseil du LLM
+        from analyzer import generer_conseil_budget
+        conseil_llm = generer_conseil_budget(
+            analysis_result['total_variables'],
+            analysis_result['budget_max']
+        )
+
         # Générer les rapports HTML
         report_date = datetime.now().strftime('%Y-%m-%d')
         report_index = build_daily_report(
             df=df,
             report_date=report_date,
             base_url=base_url,
-            signing_key=signing_key
+            signing_key=signing_key,
+            budget_max=analysis_result['budget_max'],
+            conseil_llm=conseil_llm
         )
 
         print(f"\nRapports HTML generes!")
@@ -222,6 +231,33 @@ Une intervention technique est nécessaire pour corriger ce problème.
         print(f"  Familles: {len(report_index.families)}")
         print(f"  Total depenses: {report_index.grand_total:.2f}E")
         print(f"  URL index: {base_url}/reports/{report_date}/index.html")
+
+        # Upload vers le VPS
+        print("\n" + "=" * 80)
+        print("UPLOAD DES RAPPORTS VERS LE VPS")
+        print("=" * 80)
+
+        try:
+            from upload_reports import upload_reports_to_vps, upload_static_files
+            from pathlib import Path
+
+            # Upload des rapports HTML
+            data_reports = Path(__file__).parent.parent / "data" / "reports"
+            if data_reports.exists():
+                success = upload_reports_to_vps(data_reports)
+                if success:
+                    print("\n[OK] Rapports synchronises avec le VPS!")
+                else:
+                    print("\n[WARN] Echec de la synchronisation des rapports")
+
+            # Upload des fichiers statiques (CSS) si nécessaire
+            static_dir = Path(__file__).parent.parent / "static"
+            if static_dir.exists():
+                upload_static_files(static_dir)
+
+        except Exception as upload_error:
+            print(f"\n[WARN] Erreur lors de l'upload vers le VPS: {upload_error}")
+            print("Les rapports sont disponibles localement mais pas sur le VPS")
 
     except Exception as e:
         print(f"WARNING: Erreur lors de la generation des rapports HTML: {e}")

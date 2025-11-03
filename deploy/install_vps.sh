@@ -150,7 +150,8 @@ log_warn "Puis configurez vos credentials dans .env et api_secrets.json"
 
 log_info "Configuration du cron job..."
 
-CRON_CMD="0 20 * * * cd $APP_DIR && $APP_DIR/venv/bin/python3 run_linxo_e2e.py >> logs/cron.log 2>&1"
+# Configuration : Exécution à 10h00 (heure locale du serveur)
+CRON_CMD="0 10 * * * cd $APP_DIR && $APP_DIR/venv/bin/python3 run_linxo_e2e.py >> logs/cron.log 2>&1"
 
 # Vérifier si le cron existe déjà
 if crontab -l 2>/dev/null | grep -q "run_linxo_e2e.py"; then
@@ -158,7 +159,7 @@ if crontab -l 2>/dev/null | grep -q "run_linxo_e2e.py"; then
 else
     # Ajouter le cron job
     (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
-    log_info "Cron job ajouté : Exécution quotidienne à 20h00"
+    log_info "Cron job ajouté : Exécution quotidienne à 10h00"
 fi
 
 ###############################################################################

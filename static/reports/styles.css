@@ -328,3 +328,125 @@ body {
         font-size: 18px;
     }
 }
+
+/* Progress Section */
+.progress-section {
+    margin: 25px 0;
+    padding: 20px;
+    background-color: var(--light-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.progress-section h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.progress-bar-container {
+    background-color: #e9ecef;
+    border-radius: 6px;
+    height: 32px;
+    position: relative;
+    width: 100%;
+    border: 1px solid var(--border-color);
+    overflow: visible;
+    margin-bottom: 10px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 12px;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    transition: width 0.3s ease;
+    border-radius: 5px 0 0 5px;
+    min-width: 40px;
+}
+
+.progress-marker-100 {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: #333;
+    z-index: 10;
+}
+
+.progress-marker-100::before {
+    content: '100%';
+    position: absolute;
+    right: -24px;
+    top: -26px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #333;
+    white-space: nowrap;
+}
+
+.progress-marker-time {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #fd7e14;
+    z-index: 5;
+}
+
+.progress-marker-time .marker-label {
+    position: absolute;
+    left: -35px;
+    bottom: -24px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fd7e14;
+    white-space: nowrap;
+}
+
+.progress-hint {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: white;
+    border-left: 3px solid var(--primary-color);
+    font-size: 14px;
+    color: var(--text-primary);
+    border-radius: 4px;
+}
+
+/* Conseil Box */
+.conseil-box {
+    background-color: #fff9e6;
+    border-left: 4px solid var(--warning-color);
+    padding: 20px;
+    margin: 25px 0;
+    border-radius: 4px;
+}
+
+.conseil-box h3 {
+    font-size: 16px;
+    color: #856404;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.conseil-box p {
+    font-size: 14px;
+    color: #856404;
+    line-height: 1.6;
+    margin: 6px 0;
+}

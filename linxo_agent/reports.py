@@ -284,6 +284,8 @@ def build_daily_report(
     report_date: Optional[date | str] = None,
     base_url: Optional[str] = None,
     signing_key: Optional[str] = None,
+    budget_max: Optional[float] = None,
+    conseil_llm: Optional[str] = None,
 ) -> ReportIndex:
     """
     Construit un rapport journalier HTML avec pages par famille.
@@ -390,6 +392,12 @@ def build_daily_report(
                 continue
         return datetime.min
 
+    # Calcul de l'avancement dans le temps (pour toutes les familles)
+    import calendar
+    jour_actuel = r_date.day
+    dernier_jour = calendar.monthrange(r_date.year, r_date.month)[1]
+    avancement_mois = (jour_actuel / dernier_jour) * 100
+
     for family_report in family_reports:
         groupe = df[df["famille"] == family_report.name].copy()
 
@@ -418,15 +426,43 @@ def build_daily_report(
             token_idx = generate_token(index_relative_url, signing_key)
             index_url = f"{index_url}?t={token_idx}"
 
-        html_content = family_template.render(
-            famille_name=family_report.name,
-            total=family_report.total,
-            count=family_report.count,
-            transactions=transactions,
-            report_date=report_date_str,
-            index_url=index_url,
-        )
+        # Calcul des données de progression (si budget_max fourni)
+        render_context = {
+            "famille_name": family_report.name,
+            "total": family_report.total,
+            "count": family_report.count,
+            "transactions": transactions,
+            "report_date": report_date_str,
+            "index_url": index_url,
+            "jour_actuel": jour_actuel,
+            "dernier_jour": dernier_jour,
+            "avancement_mois": avancement_mois,
+        }
 
+        # Ajouter les informations de budget si disponibles
+        if budget_max is not None and budget_max > 0:
+            pourcentage_utilise = (family_report.total / budget_max) * 100
+            reste = budget_max - family_report.total
+
+            # Déterminer la couleur de la barre selon le statut
+            if reste < 0:
+                couleur_barre = "#dc3545"  # Rouge - dépassement
+            elif pourcentage_utilise > avancement_mois + 10:
+                couleur_barre = "#fd7e14"  # Orange - trop en avance
+            else:
+                couleur_barre = "#28a745"  # Vert - dans les clous
+
+            render_context.update({
+                "budget_max": budget_max,
+                "pourcentage_utilise": pourcentage_utilise,
+                "couleur_barre": couleur_barre,
+            })
+
+        # Ajouter le conseil LLM si disponible
+        if conseil_llm:
+            render_context["conseil_llm"] = conseil_llm
+
+        html_content = family_template.render(**render_context)
         family_report.file_path.write_text(html_content, encoding="utf-8")
 
     # Générer la page index
