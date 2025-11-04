@@ -247,6 +247,96 @@
       "commentaire": "AssuranceVie Gestion Rotschild",
       "montant": 200.0,
       "categorie": "Epargne"
+    },
+    {
+      "libelle": "BLINK",
+      "compte": "hellobank",
+      "identifiant": "BLINK",
+      "commentaire": "Alarme Video",
+      "montant": 100.0,
+      "periodicite": "annuel",
+      "mois_occurrence": [3],
+      "categorie": "MAISON"
+    },
+    {
+      "libelle": "PAYPAL *OVH",
+      "compte": "LCL",
+      "identifiant": "PAYPAL *OVH",
+      "commentaire": "Autres domaines",
+      "montant": 9.35,
+      "periodicite": "annuel",
+      "mois_occurrence": [3],
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "AMAZON PRIME",
+      "compte": "hellobank",
+      "identifiant": "AMAZON PRIME",
+      "commentaire": "Abonnement Amazon Prime",
+      "montant": 69.99,
+      "periodicite": "annuel",
+      "mois_occurrence": [4],
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "PAYPAL *OVH",
+      "compte": "LCL",
+      "identifiant": "itspirit.ovh",
+      "commentaire": "Domaine itspirit.ovh",
+      "montant": 2.39,
+      "periodicite": "annuel",
+      "mois_occurrence": [7],
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "PAYPAL *OVH",
+      "compte": "LCL",
+      "identifiant": "appliprz.ovh",
+      "commentaire": "Domaine appliprz.ovh",
+      "montant": 2.39,
+      "periodicite": "annuel",
+      "mois_occurrence": [10],
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "PAYPAL *OVH",
+      "compte": "LCL",
+      "identifiant": "VPS 152.228.218.1",
+      "commentaire": "VPS 152.228.218.1",
+      "montant": 5.39,
+      "periodicite": "annuel",
+      "mois_occurrence": [10],
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "PayPal Euro",
+      "compte": "LCL",
+      "identifiant": "Office 365",
+      "commentaire": "Office 365",
+      "montant": 129.0,
+      "periodicite": "annuel",
+      "mois_occurrence": [10],
+      "categorie": "COMMUNICATION"
+    },
+    {
+      "libelle": "PREDICA",
+      "compte": "LCL",
+      "identifiant": "PREDICA",
+      "commentaire": "Assurance PREDICA 130,65 (trimestrielle)",
+      "montant": 130.65,
+      "periodicite": "trimestriel",
+      "mois_occurrence": [2, 5, 8, 11],
+      "categorie": "Assurances"
+    },
+    {
+      "libelle": "PREDICA",
+      "compte": "LCL",
+      "identifiant": "PREDICA 87,10",
+      "commentaire": "Assurance PREDICA 87,10 (trimestrielle)",
+      "montant": 87.10,
+      "periodicite": "trimestriel",
+      "mois_occurrence": [2, 5, 8, 11],
+      "categorie": "Assurances"
     }
   ],
   "depenses_variables": [1700],

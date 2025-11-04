@@ -8,6 +8,7 @@ Gère les environnements Windows/Linux et charge toutes les configurations
 import os
 import sys
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -43,7 +44,9 @@ class Config:
     def _setup_paths(self):
         """Configure les chemins selon l'environnement (Windows/Linux)"""
 
-        if self.is_linux and (os.path.exists('/home/ubuntu') or os.path.exists('/home/linxo/LINXO')):
+        if self.is_linux and (
+            os.path.exists('/home/ubuntu') or os.path.exists('/home/linxo/LINXO')
+        ):
             # Environnement VPS (production)
             self.env_name = "VPS"
 
@@ -94,6 +97,25 @@ class Config:
         if not self.linxo_email or not self.linxo_password:
             print("[WARN] ATTENTION: Credentials Linxo manquants dans .env")
 
+    def _calculate_monthly_fixed_expenses(self, mois_courant):
+        """Calcule les dépenses fixes pour un mois donné selon leur périodicité"""
+        total = 0
+        for depense in self.depenses_data.get('depenses_fixes', []):
+            montant = float(depense.get('montant', 0) or 0)
+            periodicite = depense.get('periodicite', 'mensuel').lower()
+
+            if periodicite == 'mensuel':
+                # Dépense mensuelle: toujours comptée
+                total += montant
+            else:
+                # Dépense non-mensuelle: comptée seulement si ce mois
+                # est dans mois_occurrence
+                mois_occurrence = depense.get('mois_occurrence', [])
+                if mois_courant in mois_occurrence:
+                    total += montant
+
+        return total
+
     def _load_depenses_config(self):
         """Charge la configuration des dépenses depuis .env et JSON"""
         # Charger le fichier depenses_recurrentes.json si disponible
@@ -102,29 +124,36 @@ class Config:
                 with open(self.depenses_file, 'r', encoding='utf-8') as f:
                     self.depenses_data = json.load(f)
 
-                # Calculer le budget variable depuis le JSON: Revenus - Dépenses Fixes
+                # Calculer le budget variable depuis le JSON pour le mois courant
+                mois_courant = datetime.now().month
+
                 total_revenus = sum(
                     float(r.get('montant', 0) or 0)
                     for r in self.depenses_data.get('revenus', [])
                 )
-                total_depenses_fixes = sum(
-                    float(d.get('montant', 0) or 0)
-                    for d in self.depenses_data.get('depenses_fixes', [])
-                )
+
+                # Calculer les dépenses fixes du mois courant
+                total_depenses_fixes_mois = self._calculate_monthly_fixed_expenses(mois_courant)
+
                 # Arrondir au 100 le plus proche
-                budget_brut = total_revenus - total_depenses_fixes
+                budget_brut = total_revenus - total_depenses_fixes_mois
                 self.budget_variable = round(budget_brut / 100) * 100
 
                 # Mettre à jour les totaux dans le JSON (pour cohérence)
                 if 'totaux' not in self.depenses_data:
                     self.depenses_data['totaux'] = {}
                 self.depenses_data['totaux']['total_revenus'] = total_revenus
-                self.depenses_data['totaux']['total_depenses_fixes'] = total_depenses_fixes
-                self.depenses_data['totaux']['budget_variable_max'] = self.budget_variable
+                self.depenses_data['totaux']['total_depenses_fixes_mois_courant'] = (
+                    total_depenses_fixes_mois
+                )
+                self.depenses_data['totaux']['budget_variable_mois_courant'] = self.budget_variable
 
                 depenses_count = len(self.depenses_data.get('depenses_fixes', []))
                 print(f"[OK] Depenses recurrentes chargees: {depenses_count} depenses fixes")
-                print(f"[OK] Budget variable calcule: {self.budget_variable:.2f}€ (Revenus: {total_revenus:.2f}€ - Fixes: {total_depenses_fixes:.2f}€)")
+                print(
+                    f"[OK] Budget variable (mois {mois_courant}): {self.budget_variable:.2f}€ "
+                    f"(Revenus: {total_revenus:.2f}€ - Fixes: {total_depenses_fixes_mois:.2f}€)"
+                )
             except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
                 print(f"[WARN] Erreur lors du chargement des depenses: {e}")
                 # Fallback: utiliser .env si le JSON échoue
@@ -147,7 +176,8 @@ class Config:
         self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
 
-        # Configuration IMAP (utilise les mêmes credentials que SMTP par défaut)
+        # Configuration IMAP (utilise les mêmes credentials
+        # que SMTP par défaut)
         self.imap_email = os.getenv('IMAP_EMAIL', self.smtp_email)
         self.imap_password = os.getenv('IMAP_PASSWORD', self.smtp_password)
         self.imap_server = os.getenv('IMAP_SERVER', 'imap.gmail.com')
@@ -303,7 +333,6 @@ class Config:
         sent_reports[csv_key] = today
 
         # Nettoyer les anciennes entrées (garder seulement les 30 derniers jours)
-        from datetime import timedelta
         cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         sent_reports = {k: v for k, v in sent_reports.items() if v >= cutoff_date}
 
