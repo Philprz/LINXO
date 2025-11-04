@@ -96,6 +96,23 @@
             color: #333;
             white-space: nowrap;
         }
+        .progress-marker-time {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #fd7e14;
+            z-index: 5;
+        }
+        .progress-marker-time .marker-label {
+            position: absolute;
+            left: -35px;
+            bottom: -24px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #fd7e14;
+            white-space: nowrap;
+        }
         .families-table {
             width: 100%;
             border-collapse: collapse;
@@ -207,6 +224,9 @@
                         {{ "%.0f"|format(pourcentage_fixes) }}%
                     </div>
                     <div class="progress-marker-100"></div>
+                    <div class="progress-marker-time" style="left: {{ "%.1f"|format(avancement_mois) }}%;">
+                        <span class="marker-label">Aujourd'hui</span>
+                    </div>
                 </div>
             </div>
 
@@ -222,6 +242,9 @@
                         {{ "%.0f"|format(pourcentage) }}%
                     </div>
                     <div class="progress-marker-100"></div>
+                    <div class="progress-marker-time" style="left: {{ "%.1f"|format(avancement_mois) }}%;">
+                        <span class="marker-label">Aujourd'hui</span>
+                    </div>
                 </div>
             </div>
 

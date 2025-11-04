@@ -541,7 +541,7 @@ class NotificationManager:
                 index_url = "#"
                 if base_url:
                     report_date = getattr(report_index, "report_date", "")
-                    index_relative = f"/reports/{report_date}/index.html"
+                    index_relative = f"/{report_date}/index.html"
                     index_url = f"{base_url.rstrip('/')}{index_relative}"
                     signing_key = _os.getenv("REPORTS_SIGNING_KEY")
                     if signing_key:
@@ -605,6 +605,7 @@ class NotificationManager:
                     pourcentage_fixes=pourcentage_fixes,
                     couleur_barre_variables=couleur_barre_variables,
                     couleur_barre_fixes=couleur_barre_fixes,
+                    avancement_mois=avancement_mois,
                     families=getattr(report_index, "families", []),
                     grand_total=getattr(report_index, "grand_total", 0),
                     index_url=index_url,

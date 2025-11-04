@@ -420,7 +420,7 @@ def build_daily_report(
         transactions.sort(key=lambda x: _parse_date(x["date"]), reverse=True)
 
         # URL index
-        index_relative_url = f"/reports/{report_date_str}/index.html"
+        index_relative_url = f"/{report_date_str}/index.html"
         index_url = f"{base_url.rstrip('/')}{index_relative_url}"
         if signing_key:
             token_idx = generate_token(index_relative_url, signing_key)
