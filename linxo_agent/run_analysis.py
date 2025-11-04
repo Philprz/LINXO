@@ -239,7 +239,6 @@ Une intervention technique est nécessaire pour corriger ce problème.
 
         try:
             from upload_reports import upload_reports_to_vps, upload_static_files
-            from pathlib import Path
 
             # Upload des rapports HTML
             data_reports = Path(__file__).parent.parent / "data" / "reports"
