@@ -47,6 +47,21 @@
         {% endif %}
     </p>
 </div>
+
+{% if prediction_fin_mois is defined %}
+<div class="prediction-box" style="border-left-color: {{ couleur_prediction }};">
+    <h3>🔮 Prédiction fin de mois</h3>
+    <div class="prediction-value" style="color: {{ couleur_prediction }};">
+        {{ "%.2f"|format(prediction_fin_mois) }} €
+    </div>
+    <div class="prediction-message" style="color: {{ couleur_prediction }};">
+        {{ message_prediction }}
+    </div>
+    <div class="prediction-detail">
+        📊 Basé sur {{ jours_restants }} jour{{ "s" if jours_restants > 1 else "" }} restant{{ "s" if jours_restants > 1 else "" }} dans le mois
+    </div>
+</div>
+{% endif %}
 {% endif %}
 
 {% if conseil_llm %}

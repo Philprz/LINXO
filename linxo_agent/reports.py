@@ -452,10 +452,45 @@ def build_daily_report(
             else:
                 couleur_barre = "#28a745"  # Vert - dans les clous
 
+            # Calcul de la prédiction de fin de mois
+            jours_restants = dernier_jour - jour_actuel
+            if jour_actuel > 0:
+                depense_quotidienne_moyenne = family_report.total / jour_actuel
+                prediction_fin_mois = family_report.total + (depense_quotidienne_moyenne * jours_restants)
+                prediction_depassement = prediction_fin_mois - budget_max
+                prediction_pourcentage = (prediction_fin_mois / budget_max * 100)
+
+                # Couleur de la prédiction
+                couleur_prediction = "#28a745"  # Vert = OK
+                if prediction_depassement > 0:
+                    couleur_prediction = "#dc3545"  # Rouge = dépassement
+                elif prediction_pourcentage > 90:
+                    couleur_prediction = "#fd7e14"  # Orange = attention
+
+                # Message de prédiction
+                if prediction_depassement > 0:
+                    message_prediction = f"⚠️ Vous risquez de dépasser de {abs(prediction_depassement):.2f} €"
+                elif prediction_pourcentage > 90:
+                    message_prediction = f"⚡ Attention, vous serez à {prediction_pourcentage:.0f}% du budget"
+                else:
+                    message_prediction = f"✅ Vous devriez rester sous budget ({prediction_pourcentage:.0f}%)"
+            else:
+                prediction_fin_mois = 0
+                prediction_depassement = 0
+                prediction_pourcentage = 0
+                couleur_prediction = "#6c757d"
+                message_prediction = "⏳ Prédiction disponible après le 1er jour"
+
             render_context.update({
                 "budget_max": budget_max,
                 "pourcentage_utilise": pourcentage_utilise,
                 "couleur_barre": couleur_barre,
+                "prediction_fin_mois": prediction_fin_mois,
+                "prediction_depassement": prediction_depassement,
+                "prediction_pourcentage": prediction_pourcentage,
+                "couleur_prediction": couleur_prediction,
+                "message_prediction": message_prediction,
+                "jours_restants": jours_restants,
             })
 
         # Ajouter le conseil LLM si disponible

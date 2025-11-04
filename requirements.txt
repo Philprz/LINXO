@@ -33,3 +33,6 @@ bcrypt>=4.0.0  # For password hashing (optional, used for constant-time compare)
 # Additional utilities
 python-dotenv==1.0.0  # For environment variables management
 psutil>=5.9.0  # For process management and cleanup
+
+scikit-learn
+numpy

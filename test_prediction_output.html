@@ -51,7 +51,7 @@
             font-size: 18px;
         }
         .value-red { color: #dc3545; }
-        .value-green { color: {{ '#28a745' if reste >= 0 else '#dc3545' }}; }
+        .value-green { color: #28a745; }
         .value-default { color: #333; }
         .progress-section {
             margin: 15px 0;
@@ -239,23 +239,23 @@
     <div class="container">
         <div class="header">
             <h1>💰 Rapport Linxo - Budget</h1>
-            <div class="date">{{ report_date }}</div>
+            <div class="date">2025-11-04</div>
         </div>
 
         <div class="content">
             <div class="metric">
                 <span class="metric-label">Frais fixes</span>
-                <span class="metric-value value-red">{{ "%.2f"|format(total_fixes) }} €</span>
-                <span class="metric-label">/ {{ budget_fixes_prevu }} €</span>
+                <span class="metric-value value-red">2500.00 €</span>
+                <span class="metric-label">/ 3000 €</span>
             </div>
 
             <div class="progress-section">
                 <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: {{ pourcentage_fixes }}%; background: linear-gradient(90deg, {{ couleur_barre_fixes }} 0%, {{ couleur_barre_fixes }}dd 100%);">
-                        {{ "%.0f"|format(pourcentage_fixes) }}%
+                    <div class="progress-bar-fill" style="width: 83.3%; background: linear-gradient(90deg, #28a745 0%, #28a745dd 100%);">
+                        83%
                     </div>
                     <div class="progress-marker-100"></div>
-                    <div class="progress-marker-time" style="left: {{ "%.1f"|format(avancement_mois) }}%;">
+                    <div class="progress-marker-time" style="left: 13.3%;">
                         <span class="marker-label">Aujourd'hui</span>
                     </div>
                 </div>
@@ -263,39 +263,39 @@
 
             <div class="metric">
                 <span class="metric-label">Dépenses variables</span>
-                <span class="metric-value value-red">{{ "%.2f"|format(total_variables) }} €</span>
-                <span class="metric-label">/ {{ budget_max }} €</span>
+                <span class="metric-value value-red">1200.00 €</span>
+                <span class="metric-label">/ 1500 €</span>
             </div>
 
             <div class="progress-section">
                 <div class="progress-bar-container">
-                    <div class="progress-bar-fill" style="width: {{ pourcentage }}%; background: linear-gradient(90deg, {{ couleur_barre_variables }} 0%, {{ couleur_barre_variables }}dd 100%);">
-                        {{ "%.0f"|format(pourcentage) }}%
+                    <div class="progress-bar-fill" style="width: 80.0%; background: linear-gradient(90deg, #28a745 0%, #28a745dd 100%);">
+                        80%
                     </div>
                     <div class="progress-marker-100"></div>
-                    <div class="progress-marker-time" style="left: {{ "%.1f"|format(avancement_mois) }}%;">
+                    <div class="progress-marker-time" style="left: 13.3%;">
                         <span class="marker-label">Aujourd'hui</span>
                     </div>
                 </div>
             </div>
 
             <div class="metric" style="margin-top: 15px;">
-                <span class="metric-label">{{ "Dépassement" if reste < 0 else "Reste disponible" }}</span>
-                <span class="metric-value value-green">{{ "%.2f"|format(reste if reste >= 0 else -reste) }} €</span>
+                <span class="metric-label">Reste disponible</span>
+                <span class="metric-value value-green">300.00 €</span>
             </div>
 
-            <div class="prediction-box" style="border-left-color: {{ couleur_prediction }};">
+            <div class="prediction-box" style="border-left-color: #fd7e14;">
                 <div class="prediction-title">
                     🔮 Prédiction fin de mois
                 </div>
-                <div class="prediction-value" style="color: {{ couleur_prediction }};">
-                    {{ "%.2f"|format(prediction_fin_mois) }} €
+                <div class="prediction-value" style="color: #fd7e14;">
+                    1450.00 €
                 </div>
-                <div class="prediction-message" style="color: {{ couleur_prediction }};">
-                    {{ message_prediction }}
+                <div class="prediction-message" style="color: #fd7e14;">
+                    ⚡ Attention, vous serez à 97% du budget
                 </div>
                 <div class="prediction-detail">
-                    📊 Basé sur {{ jours_restants }} jour{{ "s" if jours_restants > 1 else "" }} restant{{ "s" if jours_restants > 1 else "" }} dans le mois
+                    📊 Basé sur 26 jours restants dans le mois
                 </div>
             </div>
 
@@ -310,20 +310,28 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for family in families %}
+                    
                     <tr>
-                        <td class="family-name">{{ family.name }}</td>
-                        <td class="amount-cell">{{ "%.2f"|format(family.total) }} €</td>
+                        <td class="family-name">Alimentation</td>
+                        <td class="amount-cell">400.00 €</td>
                         <td class="link-cell">
-                            <a href="{{ family.url }}" class="btn-detail">Voir →</a>
+                            <a href="#" class="btn-detail">Voir →</a>
                         </td>
                     </tr>
-                    {% endfor %}
+                    
+                    <tr>
+                        <td class="family-name">Transport</td>
+                        <td class="amount-cell">200.00 €</td>
+                        <td class="link-cell">
+                            <a href="#" class="btn-detail">Voir →</a>
+                        </td>
+                    </tr>
+                    
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
                         <td><strong>TOTAL</strong></td>
-                        <td class="amount-cell"><strong>{{ "%.2f"|format(grand_total) }} €</strong></td>
+                        <td class="amount-cell"><strong>600.00 €</strong></td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -332,7 +340,7 @@
             <div class="cta-section">
                 <p><strong>📊 Consultez le rapport complet en ligne</strong></p>
                 <p>Accédez à tous les détails de vos dépenses par famille</p>
-                <a href="{{ index_url }}" class="btn-primary">Voir le rapport complet</a>
+                <a href="#" class="btn-primary">Voir le rapport complet</a>
             </div>
         </div>
 

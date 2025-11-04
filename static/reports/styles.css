@@ -428,6 +428,40 @@ body {
     border-radius: 4px;
 }
 
+/* Prediction Box */
+.prediction-box {
+    margin: 20px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid;
+    border-radius: 8px;
+}
+
+.prediction-box h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 12px;
+}
+
+.prediction-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 12px 0;
+}
+
+.prediction-message {
+    font-size: 15px;
+    font-weight: 500;
+    margin: 10px 0;
+}
+
+.prediction-detail {
+    font-size: 13px;
+    color: #6c757d;
+    margin-top: 10px;
+}
+
 /* Conseil Box */
 .conseil-box {
     background-color: #fff9e6;

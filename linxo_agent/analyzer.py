@@ -19,6 +19,14 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from config import get_config
 
+# Import du classificateur intelligent (optionnel)
+try:
+    from smart_classifier import create_classifier
+    SMART_CLASSIFIER_AVAILABLE = True
+except ImportError:
+    SMART_CLASSIFIER_AVAILABLE = False
+    print("[INFO] Classificateur ML non disponible, mode standard actif")
+
 
 # Patterns d'exclusion
 EXCLUSIONS = {
@@ -296,12 +304,13 @@ def lire_csv_linxo(csv_path):
         return [], []
 
 
-def analyser_transactions(transactions):
+def analyser_transactions(transactions, use_ml=True):
     """
     Analyse les transactions et les classe
 
     Args:
         transactions: Liste des transactions valides
+        use_ml: Utiliser le classificateur ML si disponible (défaut: True)
 
     Returns:
         dict: Résultats de l'analyse
@@ -315,6 +324,19 @@ def analyser_transactions(transactions):
     total_fixes = 0
     total_variables = 0
 
+    # Initialiser le classificateur ML si disponible et demandé
+    classifier = None
+    ml_classifications = 0
+    if use_ml and SMART_CLASSIFIER_AVAILABLE:
+        try:
+            classifier = create_classifier()
+            print(f"[ML] Classificateur intelligent activé")
+            stats = classifier.get_statistics()
+            if stats['training_examples'] > 0:
+                print(f"[ML] {stats['training_examples']} exemples d'apprentissage")
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"[WARNING] Erreur initialisation classificateur: {e}")
+
     print("\n[ANALYSE] Classification des transactions...")
 
     for transaction in transactions:
@@ -323,6 +345,22 @@ def analyser_transactions(transactions):
         # Ignorer les revenus (montants positifs)
         if montant >= 0:
             continue
+
+        # Améliorer la catégorie avec le classificateur ML si disponible
+        if classifier:
+            current_category = transaction.get('categorie', '')
+            # Classifier si catégorie vague ou manquante
+            if not current_category or current_category in ['Non classé', 'Non classe', 'Autres']:
+                description = transaction.get('libelle_complet', transaction.get('libelle', ''))
+                new_category, confidence = classifier.classify(
+                    description,
+                    abs(montant),
+                    existing_category=None
+                )
+                if confidence >= 0.5:  # Confiance minimum
+                    transaction['categorie'] = new_category
+                    transaction['ml_confidence'] = confidence
+                    ml_classifications += 1
 
         # Vérifier si c'est une dépense récurrente
         est_recurrente, depense_match = est_depense_recurrente(transaction, depenses_fixes_ref)
@@ -338,6 +376,8 @@ def analyser_transactions(transactions):
 
     print(f"[OK] Depenses fixes:     {len(depenses_fixes):3} transactions | {total_fixes:10.2f}E")
     print(f"[OK] Depenses variables: {len(depenses_variables):3} transactions | {total_variables:10.2f}E")
+    if ml_classifications > 0:
+        print(f"[ML] {ml_classifications} transactions améliorées par IA")
 
     return {
         'depenses_fixes': depenses_fixes,

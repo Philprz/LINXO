@@ -594,6 +594,38 @@ class NotificationManager:
                 elif pourcentage_fixes > 90:
                     couleur_barre_fixes = "#fd7e14"
 
+                # Calcul de la prédiction de fin de mois
+                jours_dans_mois = calendar.monthrange(now.year, now.month)[1]
+                jours_restants = jours_dans_mois - now.day
+
+                # Prédiction basée sur la tendance actuelle (dépense quotidienne moyenne)
+                if now.day > 0:
+                    depense_quotidienne_moyenne = total_depenses / now.day
+                    prediction_fin_mois = total_depenses + (depense_quotidienne_moyenne * jours_restants)
+                    prediction_depassement = prediction_fin_mois - budget_max
+                    prediction_pourcentage = (prediction_fin_mois / budget_max * 100) if budget_max > 0 else 0
+
+                    # Couleur de la prédiction
+                    couleur_prediction = "#28a745"  # Vert = OK
+                    if prediction_depassement > 0:
+                        couleur_prediction = "#dc3545"  # Rouge = dépassement
+                    elif prediction_pourcentage > 90:
+                        couleur_prediction = "#fd7e14"  # Orange = attention
+
+                    # Message de prédiction
+                    if prediction_depassement > 0:
+                        message_prediction = f"⚠️ Vous risquez de dépasser de {abs(prediction_depassement):.2f} €"
+                    elif prediction_pourcentage > 90:
+                        message_prediction = f"⚡ Attention, vous serez à {prediction_pourcentage:.0f}% du budget"
+                    else:
+                        message_prediction = f"✅ Vous devriez rester sous budget ({prediction_pourcentage:.0f}%)"
+                else:
+                    prediction_fin_mois = 0
+                    prediction_depassement = 0
+                    prediction_pourcentage = 0
+                    couleur_prediction = "#6c757d"
+                    message_prediction = "⏳ Prédiction disponible après le 1er jour"
+
                 html_body = template.render(
                     report_date=getattr(report_index, "report_date", ""),
                     total_variables=total_depenses,
@@ -606,6 +638,12 @@ class NotificationManager:
                     couleur_barre_variables=couleur_barre_variables,
                     couleur_barre_fixes=couleur_barre_fixes,
                     avancement_mois=avancement_mois,
+                    prediction_fin_mois=prediction_fin_mois,
+                    prediction_depassement=prediction_depassement,
+                    prediction_pourcentage=prediction_pourcentage,
+                    couleur_prediction=couleur_prediction,
+                    message_prediction=message_prediction,
+                    jours_restants=jours_restants,
                     families=getattr(report_index, "families", []),
                     grand_total=getattr(report_index, "grand_total", 0),
                     index_url=index_url,
