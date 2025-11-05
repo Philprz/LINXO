@@ -8,6 +8,7 @@ Gère les environnements Windows/Linux et charge toutes les configurations
 import os
 import sys
 import json
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -247,12 +248,13 @@ class Config:
         if not self.sms_recipients:
             print("[WARN] ATTENTION: Aucun destinataire SMS configure")
 
-    def get_latest_csv(self, check_already_sent=True):
+    def get_latest_csv(self, check_already_sent=True, max_age_days=2):
         """
         Retourne le chemin du dernier fichier CSV téléchargé
 
         Args:
             check_already_sent: Si True, vérifie que le fichier n'a pas déjà été envoyé
+            max_age_days: Âge maximum du fichier en jours (défaut: 2)
 
         Returns:
             Path ou None si aucun nouveau fichier à traiter
@@ -260,6 +262,14 @@ class Config:
         csv_files = list(self.data_dir.glob('*.csv'))
         if csv_files:
             latest = max(csv_files, key=lambda p: p.stat().st_mtime)
+
+            # Vérifier l'âge du fichier
+            file_age_seconds = time.time() - latest.stat().st_mtime
+            file_age_days = file_age_seconds / 86400
+
+            if file_age_days > max_age_days:
+                print(f"[WARN] Le fichier {latest.name} a {file_age_days:.1f} jours (dernière modification: {datetime.fromtimestamp(latest.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')})")
+                print(f"[WARN] Le fichier CSV est potentiellement obsolète (âge > {max_age_days} jours)")
 
             if check_already_sent and self._is_csv_already_sent(latest):
                 print(f"[INFO] Le fichier {latest.name} a déjà été envoyé aujourd'hui")
@@ -271,6 +281,14 @@ class Config:
         csv_files = list(self.downloads_dir.glob('*.csv'))
         if csv_files:
             latest = max(csv_files, key=lambda p: p.stat().st_mtime)
+
+            # Vérifier l'âge du fichier
+            file_age_seconds = time.time() - latest.stat().st_mtime
+            file_age_days = file_age_seconds / 86400
+
+            if file_age_days > max_age_days:
+                print(f"[WARN] Le fichier {latest.name} a {file_age_days:.1f} jours (dernière modification: {datetime.fromtimestamp(latest.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')})")
+                print(f"[WARN] Le fichier CSV est potentiellement obsolète (âge > {max_age_days} jours)")
 
             if check_already_sent and self._is_csv_already_sent(latest):
                 print(f"[INFO] Le fichier {latest.name} a déjà été envoyé aujourd'hui")

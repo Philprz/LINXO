@@ -286,6 +286,7 @@ def build_daily_report(
     signing_key: Optional[str] = None,
     budget_max: Optional[float] = None,
     conseil_llm: Optional[str] = None,
+    analysis_result: Optional[Dict[str, Any]] = None,
 ) -> ReportIndex:
     """
     Construit un rapport journalier HTML avec pages par famille.
@@ -392,12 +393,6 @@ def build_daily_report(
                 continue
         return datetime.min
 
-    # Calcul de l'avancement dans le temps (pour toutes les familles)
-    import calendar
-    jour_actuel = r_date.day
-    dernier_jour = calendar.monthrange(r_date.year, r_date.month)[1]
-    avancement_mois = (jour_actuel / dernier_jour) * 100
-
     for family_report in family_reports:
         groupe = df[df["famille"] == family_report.name].copy()
 
@@ -426,7 +421,7 @@ def build_daily_report(
             token_idx = generate_token(index_relative_url, signing_key)
             index_url = f"{index_url}?t={token_idx}"
 
-        # Calcul des données de progression (si budget_max fourni)
+        # Contexte de rendu pour la page famille (sans calculs budgétaires)
         render_context = {
             "famille_name": family_report.name,
             "total": family_report.total,
@@ -434,64 +429,7 @@ def build_daily_report(
             "transactions": transactions,
             "report_date": report_date_str,
             "index_url": index_url,
-            "jour_actuel": jour_actuel,
-            "dernier_jour": dernier_jour,
-            "avancement_mois": avancement_mois,
         }
-
-        # Ajouter les informations de budget si disponibles
-        if budget_max is not None and budget_max > 0:
-            pourcentage_utilise = (family_report.total / budget_max) * 100
-            reste = budget_max - family_report.total
-
-            # Déterminer la couleur de la barre selon le statut
-            if reste < 0:
-                couleur_barre = "#dc3545"  # Rouge - dépassement
-            elif pourcentage_utilise > avancement_mois + 10:
-                couleur_barre = "#fd7e14"  # Orange - trop en avance
-            else:
-                couleur_barre = "#28a745"  # Vert - dans les clous
-
-            # Calcul de la prédiction de fin de mois
-            jours_restants = dernier_jour - jour_actuel
-            if jour_actuel > 0:
-                depense_quotidienne_moyenne = family_report.total / jour_actuel
-                prediction_fin_mois = family_report.total + (depense_quotidienne_moyenne * jours_restants)
-                prediction_depassement = prediction_fin_mois - budget_max
-                prediction_pourcentage = (prediction_fin_mois / budget_max * 100)
-
-                # Couleur de la prédiction
-                couleur_prediction = "#28a745"  # Vert = OK
-                if prediction_depassement > 0:
-                    couleur_prediction = "#dc3545"  # Rouge = dépassement
-                elif prediction_pourcentage > 90:
-                    couleur_prediction = "#fd7e14"  # Orange = attention
-
-                # Message de prédiction
-                if prediction_depassement > 0:
-                    message_prediction = f"⚠️ Vous risquez de dépasser de {abs(prediction_depassement):.2f} €"
-                elif prediction_pourcentage > 90:
-                    message_prediction = f"⚡ Attention, vous serez à {prediction_pourcentage:.0f}% du budget"
-                else:
-                    message_prediction = f"✅ Vous devriez rester sous budget ({prediction_pourcentage:.0f}%)"
-            else:
-                prediction_fin_mois = 0
-                prediction_depassement = 0
-                prediction_pourcentage = 0
-                couleur_prediction = "#6c757d"
-                message_prediction = "⏳ Prédiction disponible après le 1er jour"
-
-            render_context.update({
-                "budget_max": budget_max,
-                "pourcentage_utilise": pourcentage_utilise,
-                "couleur_barre": couleur_barre,
-                "prediction_fin_mois": prediction_fin_mois,
-                "prediction_depassement": prediction_depassement,
-                "prediction_pourcentage": prediction_pourcentage,
-                "couleur_prediction": couleur_prediction,
-                "message_prediction": message_prediction,
-                "jours_restants": jours_restants,
-            })
 
         # Ajouter le conseil LLM si disponible
         if conseil_llm:
@@ -508,12 +446,86 @@ def build_daily_report(
         token = generate_token(index_relative_url, signing_key)
         index_url = f"{index_url}?t={token}"
 
-    index_html = index_template.render(
-        report_date=report_date_str,
-        families=families_data,
-        grand_total=grand_total,
-        total_transactions=total_transactions,
-    )
+    # Préparer les données budgétaires pour l'index
+    index_context = {
+        "report_date": report_date_str,
+        "families": families_data,
+        "grand_total": grand_total,
+        "total_transactions": total_transactions,
+    }
+
+    # Ajouter les données budgétaires si disponibles
+    if analysis_result and budget_max:
+        import calendar
+        jour_actuel = r_date.day
+        dernier_jour = calendar.monthrange(r_date.year, r_date.month)[1]
+        avancement_mois = (jour_actuel / dernier_jour) * 100
+
+        total_variables = analysis_result.get("total_variables", 0)
+        total_fixes = analysis_result.get("total_fixes", 0)
+        reste = budget_max - total_variables
+        pourcentage = (total_variables / budget_max * 100) if budget_max > 0 else 0
+
+        # Déterminer la couleur de la barre selon le statut
+        if reste < 0:
+            couleur_barre_variables = "#dc3545"  # Rouge - dépassement
+        elif pourcentage > avancement_mois + 10:
+            couleur_barre_variables = "#fd7e14"  # Orange - trop en avance
+        else:
+            couleur_barre_variables = "#28a745"  # Vert - dans les clous
+
+        # Calcul de la prédiction de fin de mois
+        jours_restants = dernier_jour - jour_actuel
+        if jour_actuel > 0:
+            depense_quotidienne_moyenne = total_variables / jour_actuel
+            prediction_fin_mois = total_variables + (depense_quotidienne_moyenne * jours_restants)
+            prediction_depassement = prediction_fin_mois - budget_max
+            prediction_pourcentage = (prediction_fin_mois / budget_max * 100) if budget_max > 0 else 0
+
+            # Couleur de la prédiction
+            couleur_prediction = "#28a745"  # Vert = OK
+            if prediction_depassement > 0:
+                couleur_prediction = "#dc3545"  # Rouge = dépassement
+            elif prediction_pourcentage > 90:
+                couleur_prediction = "#fd7e14"  # Orange = attention
+
+            # Message de prédiction
+            if prediction_depassement > 0:
+                message_prediction = f"⚠️ Vous risquez de dépasser de {abs(prediction_depassement):.2f} €"
+            elif prediction_pourcentage > 90:
+                message_prediction = f"⚡ Attention, vous serez à {prediction_pourcentage:.0f}% du budget"
+            else:
+                message_prediction = f"✅ Vous devriez rester sous budget ({prediction_pourcentage:.0f}%)"
+        else:
+            prediction_fin_mois = 0
+            prediction_depassement = 0
+            prediction_pourcentage = 0
+            couleur_prediction = "#6c757d"
+            message_prediction = "⏳ Prédiction disponible après le 1er jour"
+
+        index_context.update({
+            "budget_max": budget_max,
+            "total_variables": total_variables,
+            "total_fixes": total_fixes,
+            "reste": reste,
+            "pourcentage": pourcentage,
+            "couleur_barre_variables": couleur_barre_variables,
+            "avancement_mois": avancement_mois,
+            "jour_actuel": jour_actuel,
+            "dernier_jour": dernier_jour,
+            "prediction_fin_mois": prediction_fin_mois,
+            "prediction_depassement": prediction_depassement,
+            "prediction_pourcentage": prediction_pourcentage,
+            "couleur_prediction": couleur_prediction,
+            "message_prediction": message_prediction,
+            "jours_restants": jours_restants,
+        })
+
+    # Ajouter le conseil LLM si disponible
+    if conseil_llm:
+        index_context["conseil_llm"] = conseil_llm
+
+    index_html = index_template.render(**index_context)
     (base_dir / "index.html").write_text(index_html, encoding="utf-8")
 
     return ReportIndex(

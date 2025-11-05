@@ -94,6 +94,48 @@ Action immédiate requise pour rétablir le service.
 
         print(f"Utilisation du dernier CSV: {csv_file}")
 
+        # Vérifier l'âge du fichier et envoyer une alerte si trop ancien
+        import time
+        file_age_seconds = time.time() - Path(csv_file).stat().st_mtime
+        file_age_days = file_age_seconds / 86400
+
+        if file_age_days > 2:
+            print(f"\n[WARN] Le fichier CSV a {file_age_days:.1f} jours")
+            print(f"[WARN] Le fichier est potentiellement obsolète")
+
+            # Envoyer une alerte technique
+            try:
+                notification_manager = NotificationManager()
+                file_mtime = datetime.fromtimestamp(Path(csv_file).stat().st_mtime)
+                error_msg = f"""Le fichier CSV utilisé pour l'analyse est obsolète.
+
+Fichier: {Path(csv_file).name}
+Dernière modification: {file_mtime.strftime('%Y-%m-%d %H:%M:%S')}
+Âge du fichier: {file_age_days:.1f} jours
+
+Le fichier CSV devrait être mis à jour quotidiennement.
+Un fichier de plus de 2 jours indique que le téléchargement automatique ne fonctionne plus.
+
+Causes possibles:
+1. Le téléchargement automatique depuis Linxo a échoué
+2. Problème de connexion au site Linxo
+3. Changement de l'interface Linxo nécessitant une mise à jour du scraper
+4. Problème d'authentification (identifiants expirés ou 2FA non géré)
+
+Logs à consulter:
+- Derniers logs cron: ~/LINXO/logs/daily_report_*.log
+- Logs de téléchargement si disponibles
+
+Action requise pour rétablir le téléchargement automatique.
+"""
+                notification_manager.send_technical_alert(
+                    error_type="Fichier CSV obsolète",
+                    error_message=error_msg
+                )
+                print("\n[ALERTE] Email d'alerte technique envoyé à phiperez@gmail.com")
+            except Exception as e:
+                print(f"\n[ERREUR] Impossible d'envoyer l'alerte technique: {e}")
+
     # ETAPE 1: Analyse des depenses
     print("\n" + "=" * 80)
     print("ETAPE 1: ANALYSE DES DEPENSES")
@@ -223,7 +265,8 @@ Une intervention technique est nécessaire pour corriger ce problème.
             base_url=base_url,
             signing_key=signing_key,
             budget_max=analysis_result['budget_max'],
-            conseil_llm=conseil_llm
+            conseil_llm=conseil_llm,
+            analysis_result=analysis_result
         )
 
         print(f"\nRapports HTML generes!")

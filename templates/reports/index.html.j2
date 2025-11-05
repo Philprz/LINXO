@@ -17,6 +17,60 @@
     </div>
 </div>
 
+{% if budget_max is defined and budget_max > 0 %}
+<div class="progress-section">
+    <h3>Avancement du budget</h3>
+    <div class="progress-info">
+        <span>Jour {{ jour_actuel }}/{{ dernier_jour }} du mois ({{ "%.0f"|format(avancement_mois) }}%)</span>
+        <span>Dépensé: {{ "%.0f"|format(pourcentage) }}%</span>
+    </div>
+    <div class="progress-bar-container">
+        <div class="progress-bar-fill" style="width: {{ "%.1f"|format(pourcentage) }}%; background: {{ couleur_barre_variables }};">
+            {{ "%.0f"|format(pourcentage) }}%
+        </div>
+        <div class="progress-marker-100"></div>
+        <div class="progress-marker-time" style="left: {{ "%.1f"|format(avancement_mois) }}%;">
+            <span class="marker-label">Aujourd'hui</span>
+        </div>
+    </div>
+    <p class="progress-hint">
+        {% if pourcentage > avancement_mois + 10 %}
+        ⚠️ Vous êtes en avance sur votre budget (dépensé {{ "%.0f"|format(pourcentage - avancement_mois) }}% de plus que prévu à cette date)
+        {% elif pourcentage < avancement_mois - 10 %}
+        ✅ Vous êtes en retard sur votre budget (économisé {{ "%.0f"|format(avancement_mois - pourcentage) }}% de plus que prévu)
+        {% else %}
+        👍 Votre rythme de dépenses est conforme au budget
+        {% endif %}
+    </p>
+</div>
+
+{% if prediction_fin_mois is defined %}
+<div class="prediction-box" style="border-left-color: {{ couleur_prediction }};">
+    <h3>🔮 Prédiction fin de mois</h3>
+    <div class="prediction-value" style="color: {{ couleur_prediction }};">
+        {{ "%.2f"|format(prediction_fin_mois) }} €
+    </div>
+    <div class="prediction-message" style="color: {{ couleur_prediction }};">
+        {{ message_prediction }}
+    </div>
+    <div class="prediction-detail">
+        📊 Basé sur {{ jours_restants }} jour{{ "s" if jours_restants > 1 else "" }} restant{{ "s" if jours_restants > 1 else "" }} dans le mois
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+{% if conseil_llm %}
+<div class="conseil-box">
+    <h3>💡 Conseil de votre Agent Budget</h3>
+    {% for ligne in conseil_llm.split('\n') %}
+        {% if ligne.strip() %}
+        <p>{{ ligne }}</p>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="section">
     <h2>Dépenses par famille</h2>
     <p class="section-description">Cliquez sur une famille pour voir le détail des transactions</p>
