@@ -165,6 +165,7 @@ def _config_from_env() -> NotificationConfig:
     ovh_settings: Optional[OvhSmsSettings] = None
     # Support des variables d'origine: OVH_USER_API, SMS_SENDER, SMS_RECIPIENT, OVH_APP_SECRET
     ovh_account = os.getenv("OVH_USER_API") or os.getenv("OVH_SMS_ACCOUNT")
+    ovh_service_name = os.getenv("OVH_SERVICE_NAME") or ovh_account
     sms_sender = os.getenv("SMS_SENDER") or os.getenv("OVH_SMS_SENDER")
 
     if ovh_account:
@@ -174,6 +175,7 @@ def _config_from_env() -> NotificationConfig:
             application_secret=os.getenv("OVH_APP_SECRET", ""),
             consumer_key=os.getenv("OVH_CONSUMER_KEY", ""),
             account=ovh_account,
+            user=ovh_service_name or ovh_account,
             sender=sms_sender or "",
             default_recipients=tuple(_to_list(
                 os.getenv("SMS_RECIPIENT") or os.getenv("OVH_SMS_RECIPIENTS")
