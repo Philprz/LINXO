@@ -230,7 +230,7 @@ Une intervention technique est nécessaire pour corriger ce problème.
         print(f"  Repertoire: {report_index.base_dir}")
         print(f"  Familles: {len(report_index.families)}")
         print(f"  Total depenses: {report_index.grand_total:.2f}E")
-        print(f"  URL index: {base_url}/reports/{report_date}/index.html")
+        print(f"  URL index: {base_url}/{report_date}/index.html")
 
         # Upload vers le VPS
         print("\n" + "=" * 80)
