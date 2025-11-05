@@ -144,28 +144,40 @@ def _config_from_env() -> NotificationConfig:
       - OVH_SMS_RECIPIENTS (liste séparée par des virgules)
     """
     email_settings: Optional[EmailSettings] = None
-    if os.getenv("SMTP_HOST") and os.getenv("SMTP_SENDER"):
+    # Support des variables d'origine: SENDER_EMAIL, SENDER_PASSWORD, NOTIFICATION_EMAIL
+    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("SMTP_SENDER")
+    sender_password = os.getenv("SENDER_PASSWORD") or os.getenv("SMTP_PASSWORD")
+
+    if sender_email:
         email_settings = EmailSettings(
-            host=os.getenv("SMTP_HOST", ""),
+            host=os.getenv("SMTP_HOST", "smtp.gmail.com"),
             port=_safe_int(os.getenv("SMTP_PORT"), 465),
-            username=os.getenv("SMTP_USER", ""),
-            password=os.getenv("SMTP_PASSWORD", ""),
-            sender=os.getenv("SMTP_SENDER", ""),
+            username=os.getenv("SMTP_USER") or sender_email,
+            password=sender_password or "",
+            sender=sender_email,
             use_ssl=_env_bool("SMTP_USE_SSL", True),
             use_starttls=_env_bool("SMTP_USE_STARTTLS", False),
-            default_recipients=tuple(_to_list(os.getenv("NOTIFICATION_EMAILS"))),
+            default_recipients=tuple(_to_list(
+                os.getenv("NOTIFICATION_EMAIL") or os.getenv("NOTIFICATION_EMAILS")
+            )),
         )
 
     ovh_settings: Optional[OvhSmsSettings] = None
-    if os.getenv("OVH_ENDPOINT") and os.getenv("OVH_APP_KEY"):
+    # Support des variables d'origine: OVH_USER_API, SMS_SENDER, SMS_RECIPIENT, OVH_APP_SECRET
+    ovh_account = os.getenv("OVH_USER_API") or os.getenv("OVH_SMS_ACCOUNT")
+    sms_sender = os.getenv("SMS_SENDER") or os.getenv("OVH_SMS_SENDER")
+
+    if ovh_account:
         ovh_settings = OvhSmsSettings(
             endpoint=os.getenv("OVH_ENDPOINT", "ovh-eu"),
             application_key=os.getenv("OVH_APP_KEY", ""),
             application_secret=os.getenv("OVH_APP_SECRET", ""),
             consumer_key=os.getenv("OVH_CONSUMER_KEY", ""),
-            account=os.getenv("OVH_SMS_ACCOUNT", ""),
-            sender=os.getenv("OVH_SMS_SENDER", ""),
-            default_recipients=tuple(_to_list(os.getenv("OVH_SMS_RECIPIENTS"))),
+            account=ovh_account,
+            sender=sms_sender or "",
+            default_recipients=tuple(_to_list(
+                os.getenv("SMS_RECIPIENT") or os.getenv("OVH_SMS_RECIPIENTS")
+            )),
         )
 
     return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings)
