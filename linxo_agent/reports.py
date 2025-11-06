@@ -454,6 +454,40 @@ def build_daily_report(
         "total_transactions": total_transactions,
     }
 
+    # Ajouter les familles de dépenses agrégées si disponibles
+    if analysis_result and 'familles_aggregees' in analysis_result:
+        familles_agg = analysis_result['familles_aggregees']
+        famille_alerts = analysis_result.get('famille_alerts', [])
+
+        # Formater les données pour le template
+        familles_depenses_data = []
+        for nom_famille, data in sorted(familles_agg.items(), key=lambda x: x[1]['total'], reverse=True):
+            famille_item = {
+                'nom': nom_famille,
+                'description': data.get('description', ''),
+                'total': data['total'],
+                'budget': data.get('budget', 0),
+                'pourcentage': data.get('pourcentage', 0),
+                'statut': data.get('statut', ''),
+                'mode_affichage': data.get('mode_affichage', 'detail'),
+                'nb_transactions': data.get('nb_transactions', 0),
+                'transactions': []
+            }
+
+            # Ajouter les transactions si mode détaillé
+            if data['mode_affichage'] == 'detail':
+                for trans in data.get('transactions', []):
+                    famille_item['transactions'].append({
+                        'libelle': trans.get('libelle_complet', trans.get('libelle', '')),
+                        'montant': abs(trans.get('montant', 0)),
+                        'date': trans.get('date', '')
+                    })
+
+            familles_depenses_data.append(famille_item)
+
+        index_context['familles_depenses'] = familles_depenses_data
+        index_context['famille_alerts'] = [alert['message'] for alert in famille_alerts]
+
     # Ajouter les données budgétaires si disponibles
     if analysis_result and budget_max:
         import calendar

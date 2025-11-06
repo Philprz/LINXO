@@ -30,6 +30,7 @@ def afficher_menu():
     print("3. Corriger des classifications")
     print("4. Suggérer des améliorations")
     print("5. Ajouter un exemple d'entraînement manuel")
+    print("6. Réviser les suggestions de dépenses récurrentes")
     print("0. Quitter")
     print()
 
@@ -235,6 +236,143 @@ def ajouter_exemple_manuel(classifier):
     print(f"\n[OK] Exemple ajouté: '{description}' → {categorie}")
 
 
+def reviser_suggestions_patterns():
+    """Révise les suggestions de dépenses récurrentes détectées automatiquement."""
+    import json
+    from pattern_learner import RecurringPatternLearner
+
+    print("\n" + "="*80)
+    print("REVISION DES SUGGESTIONS DE DEPENSES RECURRENTES")
+    print("="*80)
+
+    config = get_config()
+    learner = RecurringPatternLearner(config)
+
+    suggestions = learner.get_suggestions()
+
+    if not suggestions:
+        print("\n[INFO] Aucune suggestion disponible")
+        print("[INFO] Lancez d'abord une analyse pour detecter les patterns")
+        return
+
+    print(f"\n{len(suggestions)} suggestion(s) disponible(s)\n")
+
+    approuvees = 0
+    rejetees = 0
+
+    for i, suggestion in enumerate(suggestions[:], 1):  # Copie pour modification
+        print(f"\n--- Suggestion {i}/{len(suggestions)} ---")
+
+        action_type = suggestion.get('action', 'new_recurring')
+
+        if action_type == 'add_libelle_variant':
+            # Suggestion de variante de libellé
+            print(f"Type        : Variante de libelle")
+            print(f"Depense     : {suggestion['depense_existante']}")
+            print(f"Nouveau     : {suggestion['nouveau_libelle']}")
+            print(f"Occurrences : {suggestion['occurrences']}")
+            print(f"Montant moy : {suggestion['montant_moyen']:.2f} EUR")
+            print(f"Confiance   : {suggestion['confidence']*100:.0f}%")
+        else:
+            # Suggestion de nouvelle dépense récurrente
+            print(f"Type        : Nouvelle depense recurrente")
+            print(f"Libelle     : {suggestion['libelle']}")
+            print(f"Montant     : {suggestion['montant']:.2f} EUR")
+            print(f"Tolerance   : {suggestion['montant_tolerance']*100:.0f}%")
+            print(f"Categorie   : {suggestion['categorie']}")
+            print(f"Periodicite : {suggestion.get('periodicite', 'mensuel')}")
+            print(f"Occurrences : {suggestion['occurrences']}")
+            print(f"Confiance   : {suggestion['confidence']*100:.0f}%")
+
+        print("\nOptions:")
+        print("  [a] Approuver et ajouter")
+        print("  [r] Rejeter (blacklister)")
+        print("  [s] Passer")
+        print("  [q] Quitter")
+
+        choix = input("\nVotre choix: ").strip().lower()
+
+        if choix == 'q':
+            break
+        elif choix == 's':
+            continue
+        elif choix == 'a':
+            # Approuver et ajouter à depenses_recurrentes.json
+            try:
+                # Charger le fichier JSON
+                depenses_file = config.linxo_agent_dir / 'depenses_recurrentes.json'
+                with open(depenses_file, 'r', encoding='utf-8') as f:
+                    depenses_data = json.load(f)
+
+                if action_type == 'add_libelle_variant':
+                    # Ajouter un libellé variant à une dépense existante
+                    depense_existante_id = suggestion['depense_existante']
+
+                    # Trouver la dépense correspondante
+                    found = False
+                    for depense in depenses_data.get('depenses_fixes', []):
+                        identifiant = depense.get('identifiant', '')
+                        libelle_raw = depense.get('libelle', '')
+
+                        if identifiant == depense_existante_id or libelle_raw == depense_existante_id:
+                            # Convertir libelle en array si nécessaire
+                            if isinstance(depense['libelle'], str):
+                                depense['libelle'] = [depense['libelle']]
+
+                            # Ajouter le nouveau libellé
+                            nouveau = suggestion['nouveau_libelle']
+                            if nouveau not in depense['libelle']:
+                                depense['libelle'].append(nouveau)
+                                print(f"[OK] Libelle '{nouveau}' ajoute a '{depense_existante_id}'")
+                                found = True
+                            break
+
+                    if not found:
+                        print(f"[WARN] Depense '{depense_existante_id}' non trouvee")
+                else:
+                    # Ajouter nouvelle dépense récurrente
+                    nouvelle_depense = {
+                        'libelle': suggestion['libelle'],
+                        'compte': 'Auto-detecte',
+                        'identifiant': suggestion['identifiant'],
+                        'commentaire': suggestion['commentaire'],
+                        'montant': suggestion['montant'],
+                        'montant_tolerance': suggestion['montant_tolerance'],
+                        'categorie': suggestion['categorie'],
+                        'periodicite': suggestion.get('periodicite', 'mensuel')
+                    }
+
+                    depenses_data.setdefault('depenses_fixes', []).append(nouvelle_depense)
+                    print(f"[OK] Nouvelle depense '{suggestion['identifiant']}' ajoutee")
+
+                # Sauvegarder le fichier
+                with open(depenses_file, 'w', encoding='utf-8') as f:
+                    json.dump(depenses_data, f, indent=2, ensure_ascii=False)
+
+                # Retirer de la liste des suggestions
+                learner.remove_suggestion(suggestions.index(suggestion))
+                approuvees += 1
+
+            except Exception as e:
+                print(f"[ERREUR] Impossible d'ajouter: {e}")
+
+        elif choix == 'r':
+            # Rejeter et blacklister
+            if action_type == 'add_libelle_variant':
+                pattern = suggestion['nouveau_libelle']
+            else:
+                pattern = suggestion['libelle']
+
+            learner.blacklist_pattern(pattern)
+            learner.remove_suggestion(suggestions.index(suggestion))
+            rejetees += 1
+            print(f"[OK] Pattern '{pattern}' rejete et blackliste")
+
+    print(f"\n{'='*80}")
+    print(f"[RESUME] {approuvees} approuvee(s), {rejetees} rejetee(s)")
+    print(f"{'='*80}")
+
+
 def main():
     """Fonction principale."""
     # Initialiser le classificateur
@@ -261,6 +399,8 @@ def main():
             suggerer_ameliorations(classifier)
         elif choix == '5':
             ajouter_exemple_manuel(classifier)
+        elif choix == '6':
+            reviser_suggestions_patterns()
         else:
             print("\n[ERREUR] Choix invalide")
 

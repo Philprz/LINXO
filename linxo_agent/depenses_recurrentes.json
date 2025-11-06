@@ -20,18 +20,11 @@
       "libelle": "THELEM ASSURANCES",
       "compte": "LCL",
       "identifiant": "THELEM",
-      "commentaire": "Assurance Leon",
-      "montant": 90.0,
+      "commentaire": "Assurance Captur, Twingo, Juridique",
+      "montant": 151.61,
       "categorie": "VOITURE"
     },
-    {
-      "libelle": "THELEM ASSURANCES",
-      "compte": "LCL",
-      "identifiant": "THELEM",
-      "commentaire": "Assurance Twingo",
-      "montant": 50.0,
-      "categorie": "VOITURE"
-    },
+    
     {
       "libelle": "DIAC",
       "compte": "LCL",
@@ -51,17 +44,19 @@
     {
       "libelle": "ENGIE",
       "compte": "LCL",
-      "identifiant": "GAZ - ENGIE",
-      "commentaire": "",
+      "identifiant": "Gaz naturel",
+      "commentaire": "Varie selon consommation",
       "montant": 133.0,
+      "montant_tolerance": 0.30,
       "categorie": "MAISON"
     },
     {
       "libelle": "EDF clients particuli",
       "compte": "LCL",
-      "identifiant": "ELECTRICITE - EDF",
-      "commentaire": "",
+      "identifiant": "Electricite maison",
+      "commentaire": "Varie selon consommation",
       "montant": 129.0,
+      "montant_tolerance": 0.30,
       "categorie": "MAISON"
     },
     {
@@ -217,11 +212,12 @@
       "categorie": "Transport"
     },
     {
-      "libelle": "REG.RECETTE OURA",
+      "libelle": ["REG.RECETTE OURA", "SNCF"],
       "compte": "Boursobank",
-      "identifiant": "Transport en commun",
-      "commentaire": "Abonnement transport",
+      "identifiant": "Transports en commun (TER+TCL)",
+      "commentaire": "Parfois groupes, parfois separes",
       "montant": 96.1,
+      "montant_tolerance": 1.0,
       "categorie": "Transport"
     },
     {
@@ -379,5 +375,32 @@
     "total_depenses_fixes": 3048.01,
     "total_revenus": 4745.87,
     "budget_variable_max": 1700
-  }
+  },
+  "familles_depenses": [
+    {
+      "nom": "Transports Personnel",
+      "description": "Tous les abonnements de transport en commun de la famille",
+      "mode_affichage": "agrege",
+      "membres": [
+        {"ref_libelle": "REG.RECETTE OURA"},
+        {"ref_libelle": "SNCF-VOYAGEURS"},
+        {"ref_libelle": "Emma PEREZ"}
+      ],
+      "budget_mensuel": 200.0,
+      "alerte_si_depasse": true,
+      "categorie": "Transport"
+    },
+    {
+      "nom": "Energie Maison",
+      "description": "Electricite et gaz",
+      "mode_affichage": "detail",
+      "membres": [
+        {"ref_libelle": "EDF clients particuli"},
+        {"ref_libelle": "ENGIE"}
+      ],
+      "budget_mensuel": 270.0,
+      "alerte_si_depasse": true,
+      "categorie": "MAISON"
+    }
+  ]
 }

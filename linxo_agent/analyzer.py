@@ -154,39 +154,41 @@ def est_depense_recurrente(transaction, depenses_fixes):
 
     # Méthode 1: Matching avec le fichier depenses_recurrentes.json
     for depense_fixe in depenses_fixes:
-        pattern_libelle = depense_fixe.get('libelle', '').upper()
-        identifiant = depense_fixe.get('identifiant', '').upper()
+        # Support de libellés multiples: string OU array
+        pattern_libelle_raw = depense_fixe.get('libelle', '')
+        if isinstance(pattern_libelle_raw, str):
+            patterns_libelle = [pattern_libelle_raw] if pattern_libelle_raw else []
+        else:
+            patterns_libelle = pattern_libelle_raw  # Déjà une liste
+
+        identifiant = depense_fixe.get('identifiant', '')
         montant_reference = depense_fixe.get('montant', 0)
+        # Tolérance personnalisable (défaut 5%)
+        montant_tolerance = depense_fixe.get('montant_tolerance', 0.05)
 
-        # Si le pattern est présent dans le libellé de la transaction
-        if pattern_libelle and pattern_libelle in libelle_upper:
-            # Vérification supplémentaire avec identifiant si fourni ET présent dans le libellé
-            if identifiant and identifiant in libelle_upper:
-                # Le libellé ET l'identifiant correspondent : c'est un match parfait
-                return True, {
-                    'nom': depense_fixe.get('libelle', 'Depense fixe'),
-                    'categorie': depense_fixe.get('categorie', 'Non classe')
-                }
+        # Essayer chaque pattern de libellé
+        for pattern_libelle_str in patterns_libelle:
+            pattern_libelle = pattern_libelle_str.upper()
 
-            # Si pas d'identifiant dans le libellé, vérifier le montant pour différencier
-            if identifiant and identifiant not in libelle_upper:
-                montant_transaction = abs(transaction.get('montant', 0))
-                # Tolérance de 5% sur le montant pour gérer les variations
-                if montant_reference > 0 and abs(montant_transaction - montant_reference) / montant_reference <= 0.05:
-                    # Le libellé correspond et le montant est proche : c'est un match
+            # Si le pattern est présent dans le libellé de la transaction
+            if pattern_libelle and pattern_libelle in libelle_upper:
+                # L'identifiant n'est plus utilisé pour le matching, seulement pour l'affichage
+                # Vérifier le montant si un montant de référence est défini
+                if montant_reference > 0:
+                    montant_transaction = abs(transaction.get('montant', 0))
+                    # Utiliser la tolérance personnalisée
+                    if abs(montant_transaction - montant_reference) / montant_reference <= montant_tolerance:
+                        # Le libellé correspond et le montant est dans la tolérance
+                        return True, {
+                            'nom': depense_fixe.get('identifiant', pattern_libelle_str) if identifiant else pattern_libelle_str,
+                            'categorie': depense_fixe.get('categorie', 'Non classe')
+                        }
+                else:
+                    # Pas de montant de référence, le libellé seul suffit
                     return True, {
-                        'nom': depense_fixe.get('libelle', 'Depense fixe'),
+                        'nom': depense_fixe.get('identifiant', pattern_libelle_str) if identifiant else pattern_libelle_str,
                         'categorie': depense_fixe.get('categorie', 'Non classe')
                     }
-                # Sinon, continuer la recherche (peut-être une autre règle correspondra mieux)
-                continue
-
-            # Si pas d'identifiant défini, le libellé seul suffit
-            if not identifiant:
-                return True, {
-                    'nom': depense_fixe.get('libelle', 'Depense fixe'),
-                    'categorie': depense_fixe.get('categorie', 'Non classe')
-                }
 
     # Méthode 2: Si le label contient 'Récurrent' (fallback)
     labels = transaction.get('labels', '')
@@ -379,12 +381,61 @@ def analyser_transactions(transactions, use_ml=True):
     if ml_classifications > 0:
         print(f"[ML] {ml_classifications} transactions améliorées par IA")
 
+    # Lancer la détection automatique de patterns (Phase 2)
+    try:
+        from pattern_learner import RecurringPatternLearner
+        learner = RecurringPatternLearner(config)
+
+        # Détecter nouvelles dépenses récurrentes
+        new_recurring = learner.detect_new_recurring(all_transactions, months_to_analyze=6, min_occurrences=3)
+
+        # Détecter variantes de libellés
+        libelle_variants = learner.detect_libelle_variants(depenses_recurrentes, all_transactions, months_to_analyze=6)
+
+        # Sauvegarder les suggestions (sera affiché dans le rapport)
+        if new_recurring or libelle_variants:
+            for suggestion in new_recurring:
+                learner.add_suggestion(suggestion)
+            for suggestion in libelle_variants:
+                learner.add_suggestion(suggestion)
+
+            print(f"[PATTERN LEARNER] {len(new_recurring)} nouvelles depenses recurrentes detectees")
+            print(f"[PATTERN LEARNER] {len(libelle_variants)} variantes de libelles detectees")
+    except Exception as e:
+        print(f"[WARN] Erreur pattern learner: {e}")
+
+    # Agréger les dépenses par famille (Phase 3)
+    familles_aggregees = {}
+    famille_alerts = []
+    try:
+        from family_aggregator import ExpenseFamilyAggregator
+        aggregator = ExpenseFamilyAggregator(config)
+
+        # Agréger les transactions par famille
+        familles_aggregees = aggregator.aggregate_by_family(depenses_fixes)
+
+        # Obtenir les alertes
+        famille_alerts = aggregator.get_alerts(familles_aggregees)
+
+        # Afficher le résumé
+        if familles_aggregees:
+            print("\n" + aggregator.get_family_summary(familles_aggregees))
+
+        if famille_alerts:
+            print("\n[ALERTES FAMILLES]")
+            for alert in famille_alerts:
+                print(f"  - {alert['message']}")
+    except Exception as e:
+        print(f"[WARN] Erreur family aggregator: {e}")
+
     return {
         'depenses_fixes': depenses_fixes,
         'depenses_variables': depenses_variables,
         'total_fixes': total_fixes,
         'total_variables': total_variables,
-        'total': total_fixes + total_variables
+        'total': total_fixes + total_variables,
+        'familles_aggregees': familles_aggregees,
+        'famille_alerts': famille_alerts
     }
 
 
