@@ -18,9 +18,11 @@ from datetime import datetime, timedelta
 
 from selenium import webdriver
 from selenium.common.exceptions import (
+    ElementClickInterceptedException,
+    ElementNotInteractableException,
     NoSuchElementException,
     TimeoutException,
-    WebDriverException
+    WebDriverException,
 )
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -780,17 +782,28 @@ def telecharger_csv_linxo(driver, wait):
 
         # ÉTAPE 2: Cliquer sur "Recherche avancée"
         print("[ETAPE 2] Clic sur 'Recherche avancee'...")
-        try:
-            # Chercher le lien "Recherche avancée" par sa classe
-            recherche_avancee = wait.until(
-                EC.element_to_be_clickable((By.CLASS_NAME, "GJALL4ABIGC"))
-            )
-            recherche_avancee.click()
-            print("[OK] Clic sur 'Recherche avancee' reussi")
-            time.sleep(2)
-        except ImportError:
-            print("[WARNING] Impossible de cliquer sur 'Recherche avancee': ")
-            # Continuer quand même, peut-être que c'est déjà ouvert
+        # Essayer plusieurs sélecteurs pour gérer les changements de classes côté Linxo
+        advanced_search_locators = [
+            ("classe CSS", (By.CLASS_NAME, "GJALL4ABIGC")),
+            ("texte partiel", (By.XPATH, "//*[contains(normalize-space(.), 'Recherche avanc')]")),
+        ]
+        for locator_name, locator in advanced_search_locators:
+            try:
+                recherche_avancee = wait.until(EC.element_to_be_clickable(locator))
+                try:
+                    recherche_avancee.click()
+                except (ElementClickInterceptedException, ElementNotInteractableException):
+                    # Fallback JS click si un overlay bloque l'interaction native
+                    driver.execute_script("arguments[0].click();", recherche_avancee)
+                print(f"[OK] Clic sur 'Recherche avancee' reussi ({locator_name})")
+                time.sleep(2)
+                break
+            except (TimeoutException, NoSuchElementException) as e:
+                print(f"[WARNING] Locateur '{locator_name}' indisponible pour 'Recherche avancee': {e}")
+            except WebDriverException as e:
+                print(f"[WARNING] Erreur WebDriver lors du clic 'Recherche avancee' ({locator_name}): {e}")
+        else:
+            print("[WARNING] Impossible de cliquer sur 'Recherche avancee'. Continuation avec les filtres par defaut.")
 
         # ÉTAPE 3: Sélectionner "Ce mois-ci" dans le menu déroulant
         print("[ETAPE 3] Selection de 'Ce mois-ci' dans le menu deroulant...")
