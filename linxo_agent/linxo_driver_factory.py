@@ -41,7 +41,7 @@ def get_driver_module():
         module: Module de connexion approprié
     """
     if is_server_environment():
-        print("[DRIVER] Environnement serveur détecté → utilisation de undetected-chromedriver")
+        print("[DRIVER] Environnement serveur detecte -> utilisation de undetected-chromedriver")
         try:
             from . import linxo_connexion_undetected
             return linxo_connexion_undetected
@@ -51,7 +51,7 @@ def get_driver_module():
             from . import linxo_connexion
             return linxo_connexion
     else:
-        print("[DRIVER] Environnement local détecté → utilisation du driver standard")
+        print("[DRIVER] Environnement local detecte -> utilisation du driver standard")
         from . import linxo_connexion
         return linxo_connexion
 

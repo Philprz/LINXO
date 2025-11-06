@@ -82,7 +82,7 @@ def formater_email_html_v2(analyse, budget_max, conseil, budget_fixes_prevu=None
     pourcentage = (total_depenses / budget_max * 100) if budget_max > 0 else 0
 
     # Calculer le budget fixes prévu depuis les dépenses fixes référence si non fourni
-    if budget_fixes_prevu is None:
+    if budget_fixes_prevu is None or budget_fixes_prevu == 0:
         # Lire depuis la config
         try:
             from config import get_config  # type: ignore

@@ -496,7 +496,7 @@ def generer_conseil_budget(total_depenses, budget_max):
         conseils.append(f"Vous pouvez depenser environ {budget_jour:.2f}E/jour.")
         conseils.append("")
 
-        if ecart < -50:
+        if ecart > 50:
             conseils.append(f"Excellent ! Vous etes en retard de {abs(ecart):.2f}E sur le budget prevu.")
             conseils.append("Vous gerez tres bien votre budget !")
 

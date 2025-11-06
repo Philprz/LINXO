@@ -649,8 +649,10 @@ def initialiser_driver_linxo(download_dir=None, headless=False, cleanup=True, ma
             options.add_argument(f'--remote-debugging-port={debug_port}')
 
             # Détection automatique du mode headless pour VPS/serveurs
+            # Sur Windows, on ne force pas le headless même si DISPLAY n'est pas défini
+            is_windows = platform.system() == 'Windows'
             is_server = (
-                os.environ.get('DISPLAY') is None or  # Pas d'affichage X
+                not is_windows and os.environ.get('DISPLAY') is None or  # Pas d'affichage X (Linux/Mac uniquement)
                 'microsoft' in platform.uname().release.lower() or  # WSL
                 headless  # Explicitement demandé
             )
@@ -658,6 +660,8 @@ def initialiser_driver_linxo(download_dir=None, headless=False, cleanup=True, ma
             if is_server:
                 options.add_argument('--headless=new')
                 print("[INFO] Mode headless active (environnement serveur detecte)")
+            else:
+                print("[INFO] Mode avec interface graphique (environnement local detecte)")
 
             # Configuration complète des préférences (téléchargements + langue)
             prefs = {

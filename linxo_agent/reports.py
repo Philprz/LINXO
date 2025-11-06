@@ -85,7 +85,7 @@ def classify_famille(categorie: str, libelle: str) -> str:
     # Épargne & Investissements
     if (
         "EPARGNE" in categorie_upper
-        or "GENERALI" in libelle_upper
+        or "GENERALI VIE" in libelle_upper
         or "BITCOIN" in categorie_upper
         or "BITSTACK" in libelle_upper
         or "CRYPTO" in categorie_upper
