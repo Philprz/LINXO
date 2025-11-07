@@ -909,6 +909,30 @@ def telecharger_csv_linxo(driver, wait):
             print(f"[SUCCESS] CSV telecharge: {target_csv}")
             print(f"[INFO] Taille: {target_csv.stat().st_size} octets")
 
+            # ÉTAPE 6: Filtrer par mois si la sélection web n'a pas fonctionné
+            if not select_found:
+                print("[ETAPE 6] Filtrage du CSV pour le mois courant (fallback)...")
+                try:
+                    from .csv_filter import filter_csv_by_month, get_csv_date_range  # pylint: disable=import-outside-toplevel
+
+                    # Afficher la plage de dates avant filtrage
+                    date_range = get_csv_date_range(target_csv)
+                    if date_range:
+                        min_date, max_date = date_range
+                        print(f"[INFO] Periode dans le CSV: {min_date.strftime('%d/%m/%Y')} -> {max_date.strftime('%d/%m/%Y')}")
+
+                    # Filtrer pour le mois courant
+                    filtered_csv = filter_csv_by_month(target_csv)
+                    if filtered_csv:
+                        print("[SUCCESS] CSV filtre pour le mois courant")
+                    else:
+                        print("[WARNING] Filtrage echoue, utilisation du CSV complet")
+                except Exception as e:
+                    print(f"[WARNING] Erreur lors du filtrage: {e}")
+                    print("[WARNING] Utilisation du CSV complet")
+            else:
+                print("[INFO] Selection web reussie, pas besoin de filtrage")
+
             return target_csv
 
         print("[ERREUR] Aucun fichier CSV trouve dans le dossier Downloads")
