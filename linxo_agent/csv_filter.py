@@ -42,10 +42,33 @@ def filter_csv_by_month(
         print(f"[FILTER] Filtrage du CSV pour {month:02d}/{year}")
         print(f"[FILTER] Fichier source: {input_csv}")
 
-        # Lire le CSV
+        # Détecter automatiquement l'encodage et le délimiteur
+        detected_encoding = None
+        detected_delimiter = None
+
+        for encoding in ['utf-16', 'utf-8', 'latin-1']:
+            for delimiter in ['\t', ';', ',']:
+                try:
+                    with open(input_csv, 'r', encoding=encoding) as f:
+                        test_reader = csv.DictReader(f, delimiter=delimiter)
+                        if date_column in test_reader.fieldnames:
+                            detected_encoding = encoding
+                            detected_delimiter = delimiter
+                            print(f"[FILTER] Détection: encodage={encoding}, délimiteur={repr(delimiter)}")
+                            break
+                except:
+                    continue
+            if detected_encoding:
+                break
+
+        if not detected_encoding:
+            print(f"[ERREUR] Impossible de détecter l'encodage du CSV")
+            return None
+
+        # Lire le CSV avec l'encodage détecté
         fieldnames = None  # Sauvegarder les noms de colonnes
-        with open(input_csv, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter=';')
+        with open(input_csv, 'r', encoding=detected_encoding) as f:
+            reader = csv.DictReader(f, delimiter=detected_delimiter)
 
             # Vérifier que la colonne de date existe
             if date_column not in reader.fieldnames:
@@ -84,9 +107,9 @@ def filter_csv_by_month(
         if output_csv is None:
             output_csv = input_csv.parent / f"filtered_{input_csv.name}"
 
-        # Écrire le fichier filtré
-        with open(output_csv, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=';')
+        # Écrire le fichier filtré AVEC LE MÊME ENCODAGE ET DÉLIMITEUR
+        with open(output_csv, 'w', encoding=detected_encoding, newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=detected_delimiter)
             writer.writeheader()
             writer.writerows(filtered_rows)
 
@@ -121,9 +144,31 @@ def get_csv_date_range(csv_path: Path, date_column: str = "Date", date_format: s
         Tuple (date_min, date_max) ou None en cas d'erreur
     """
     try:
+        # Détecter automatiquement l'encodage et le délimiteur
+        detected_encoding = None
+        detected_delimiter = None
+
+        for encoding in ['utf-16', 'utf-8', 'latin-1']:
+            for delimiter in ['\t', ';', ',']:
+                try:
+                    with open(csv_path, 'r', encoding=encoding) as f:
+                        test_reader = csv.DictReader(f, delimiter=delimiter)
+                        if date_column in test_reader.fieldnames:
+                            detected_encoding = encoding
+                            detected_delimiter = delimiter
+                            break
+                except:
+                    continue
+            if detected_encoding:
+                break
+
+        if not detected_encoding:
+            return None
+
+        # Lire les dates avec l'encodage détecté
         dates = []
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f, delimiter=';')
+        with open(csv_path, 'r', encoding=detected_encoding) as f:
+            reader = csv.DictReader(f, delimiter=detected_delimiter)
 
             if date_column not in reader.fieldnames:
                 return None
