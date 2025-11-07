@@ -196,10 +196,30 @@ def download_linxo_csv():
             # Copy to data directory
             import shutil
             shutil.copy2(latest_csv, target_csv)
-            
+
             log(f"✅ CSV downloaded successfully: {target_csv}")
             log(f"   File size: {target_csv.stat().st_size} bytes")
-            
+
+            # IMPORTANT: Filter CSV by current month
+            log("\n[FILTER] Applying month filter to CSV...")
+            try:
+                # Import the CSV filter module
+                import sys
+                sys.path.insert(0, str(BASE_DIR.parent / "linxo_agent"))
+                from csv_filter import filter_csv_by_month
+
+                # Filter for current month
+                filtered_path = filter_csv_by_month(target_csv)
+
+                if filtered_path:
+                    log(f"✅ CSV filtered for current month")
+                    log(f"   Filtered file: {filtered_path}")
+                else:
+                    log(f"⚠️ CSV filtering returned None, using unfiltered CSV")
+            except Exception as filter_error:
+                log(f"⚠️ CSV filtering failed: {filter_error}")
+                log(f"   Continuing with unfiltered CSV")
+
             driver.quit()
             return True, str(target_csv)
         else:
