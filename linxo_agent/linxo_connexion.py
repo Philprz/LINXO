@@ -784,8 +784,10 @@ def telecharger_csv_linxo(driver, wait):
         print("[ETAPE 2] Clic sur 'Recherche avancee'...")
         # Essayer plusieurs sélecteurs pour gérer les changements de classes côté Linxo
         advanced_search_locators = [
-            ("classe CSS", (By.CLASS_NAME, "GJALL4ABIGC")),
-            ("texte partiel", (By.XPATH, "//*[contains(normalize-space(.), 'Recherche avanc')]")),
+            ("attribut data-dashname", (By.CSS_SELECTOR, "[data-dashname='AdvancedResearch']")),
+            ("texte 'Plus de détails'", (By.XPATH, "//*[contains(normalize-space(.), 'Plus de d')]")),
+            ("texte 'Recherche avancée'", (By.XPATH, "//*[contains(normalize-space(.), 'Recherche avanc')]")),
+            ("lien avec role button", (By.CSS_SELECTOR, "a[role='button']")),
         ]
 
         # Créer un wait plus court pour cette étape spécifique
@@ -818,20 +820,33 @@ def telecharger_csv_linxo(driver, wait):
             print("[ETAPE 3] Selection de 'Ce mois-ci' dans le menu deroulant...")
             from selenium.webdriver.support.select import Select  # pylint: disable=import-outside-toplevel
 
-            try:
-                # Trouver le select par sa classe (avec un wait plus court)
-                select_element = short_wait.until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "GJALL4ABIY"))
-                )
+            # Essayer plusieurs méthodes pour trouver le select
+            select_locators = [
+                ("attribut data-dashname", By.CSS_SELECTOR, "select[data-dashname-rid*='period']"),
+                ("option contenant 'Ce mois-ci'", By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
+                ("option avec value='3'", By.XPATH, "//select[.//option[@value='3']]"),
+                ("premier select visible", By.TAG_NAME, "select"),
+            ]
 
-                select = Select(select_element)
+            select_found = False
+            for locator_name, by_method, selector in select_locators:
+                try:
+                    select_element = short_wait.until(
+                        EC.presence_of_element_located((by_method, selector))
+                    )
+                    select = Select(select_element)
 
-                # Sélectionner "Ce mois-ci" (value="3")
-                select.select_by_value("3")
-                print("[OK] 'Ce mois-ci' selectionne")
-                time.sleep(2)
-            except (TimeoutException, NoSuchElementException, WebDriverException) as e:
-                print(f"[WARNING] Impossible de selectionner 'Ce mois-ci'")
+                    # Sélectionner "Ce mois-ci" (value="3")
+                    select.select_by_value("3")
+                    print(f"[OK] 'Ce mois-ci' selectionne ({locator_name})")
+                    select_found = True
+                    time.sleep(2)
+                    break
+                except (TimeoutException, NoSuchElementException, WebDriverException) as e:
+                    print(f"[WARNING] Methode '{locator_name}' echouee")
+
+            if not select_found:
+                print("[WARNING] Impossible de selectionner 'Ce mois-ci'")
                 print("[WARNING] Continuer avec la periode par defaut")
         else:
             print("[ETAPE 3] Ignoree (recherche avancee non accessible)")
@@ -841,11 +856,12 @@ def telecharger_csv_linxo(driver, wait):
 
         # Essayer plusieurs méthodes pour trouver le bouton CSV
         csv_locators = [
-            ("classes exactes", By.CSS_SELECTOR, "button.GJALL4ABCV.GJALL4ABLW"),
-            ("texte CSV", By.XPATH, "//button[contains(text(), 'CSV')]"),
-            ("classe partielle", By.CSS_SELECTOR, "button.GJALL4ABCV"),
-            ("aria-label", By.CSS_SELECTOR, "button[aria-label*='CSV']"),
+            ("attribut data-dashname CSV", By.CSS_SELECTOR, "button[data-dashname*='CSV']"),
+            ("aria-label CSV", By.CSS_SELECTOR, "button[aria-label*='CSV']"),
+            ("texte CSV exact", By.XPATH, "//button[normalize-space(text())='CSV']"),
+            ("texte CSV partiel", By.XPATH, "//button[contains(text(), 'CSV')]"),
             ("texte dans span", By.XPATH, "//button[.//span[contains(text(), 'CSV')]]"),
+            ("bouton avec icone export", By.CSS_SELECTOR, "button[title*='export' i], button[title*='CSV' i]"),
         ]
 
         csv_clicked = False
