@@ -21,10 +21,11 @@
       "compte": "LCL",
       "identifiant": "THELEM",
       "commentaire": "Assurance Captur, Twingo, Juridique",
-      "montant": 151.61,
+      "montant": 161.48,
+      "montant_tolerance": 0.10,
       "categorie": "VOITURE"
     },
-    
+
     {
       "libelle": "DIAC",
       "compte": "LCL",

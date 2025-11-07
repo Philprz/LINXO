@@ -787,9 +787,14 @@ def telecharger_csv_linxo(driver, wait):
             ("classe CSS", (By.CLASS_NAME, "GJALL4ABIGC")),
             ("texte partiel", (By.XPATH, "//*[contains(normalize-space(.), 'Recherche avanc')]")),
         ]
+
+        # Créer un wait plus court pour cette étape spécifique
+        short_wait = WebDriverWait(driver, 5)
+        recherche_avancee_clicked = False
+
         for locator_name, locator in advanced_search_locators:
             try:
-                recherche_avancee = wait.until(EC.element_to_be_clickable(locator))
+                recherche_avancee = short_wait.until(EC.element_to_be_clickable(locator))
                 try:
                     recherche_avancee.click()
                 except (ElementClickInterceptedException, ElementNotInteractableException):
@@ -797,66 +802,77 @@ def telecharger_csv_linxo(driver, wait):
                     driver.execute_script("arguments[0].click();", recherche_avancee)
                 print(f"[OK] Clic sur 'Recherche avancee' reussi ({locator_name})")
                 time.sleep(2)
+                recherche_avancee_clicked = True
                 break
             except (TimeoutException, NoSuchElementException) as e:
-                print(f"[WARNING] Locateur '{locator_name}' indisponible pour 'Recherche avancee': {e}")
+                print(f"[WARNING] Locateur '{locator_name}' indisponible pour 'Recherche avancee'")
             except WebDriverException as e:
                 print(f"[WARNING] Erreur WebDriver lors du clic 'Recherche avancee' ({locator_name}): {e}")
-        else:
+
+        if not recherche_avancee_clicked:
             print("[WARNING] Impossible de cliquer sur 'Recherche avancee'. Continuation avec les filtres par defaut.")
 
         # ÉTAPE 3: Sélectionner "Ce mois-ci" dans le menu déroulant
-        print("[ETAPE 3] Selection de 'Ce mois-ci' dans le menu deroulant...")
-        from selenium.webdriver.support.select import Select  # pylint: disable=import-outside-toplevel
+        # (uniquement si la recherche avancée a été cliquée)
+        if recherche_avancee_clicked:
+            print("[ETAPE 3] Selection de 'Ce mois-ci' dans le menu deroulant...")
+            from selenium.webdriver.support.select import Select  # pylint: disable=import-outside-toplevel
 
-        try:
-            # Trouver le select par sa classe
-            select_element = wait.until(
-                EC.presence_of_element_located((By.CLASS_NAME, "GJALL4ABIY"))
-            )
+            try:
+                # Trouver le select par sa classe (avec un wait plus court)
+                select_element = short_wait.until(
+                    EC.presence_of_element_located((By.CLASS_NAME, "GJALL4ABIY"))
+                )
 
-            select = Select(select_element)
+                select = Select(select_element)
 
-            # Sélectionner "Ce mois-ci" (value="3")
-            select.select_by_value("3")
-            print("[OK] 'Ce mois-ci' selectionne")
-            time.sleep(2)
-        except (TimeoutException, NoSuchElementException, WebDriverException) as e:
-            print(f"[WARNING] Impossible de selectionner 'Ce mois-ci': {e}")
-            print("[WARNING] Continuer avec la periode par defaut")
+                # Sélectionner "Ce mois-ci" (value="3")
+                select.select_by_value("3")
+                print("[OK] 'Ce mois-ci' selectionne")
+                time.sleep(2)
+            except (TimeoutException, NoSuchElementException, WebDriverException) as e:
+                print(f"[WARNING] Impossible de selectionner 'Ce mois-ci'")
+                print("[WARNING] Continuer avec la periode par defaut")
+        else:
+            print("[ETAPE 3] Ignoree (recherche avancee non accessible)")
 
         # ÉTAPE 4: Cliquer sur le bouton "CSV"
         print("[ETAPE 4] Clic sur le bouton CSV...")
-        try:
-            # Méthode 1: Par les classes exactes
-            csv_button = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button.GJALL4ABCV.GJALL4ABLW"))
-            )
-            csv_button.click()
-            print("[OK] Clic sur bouton CSV reussi")
-            time.sleep(10)  # Attendre le téléchargement
 
-        except (TimeoutException, NoSuchElementException) as e1:
-            print(f"[WARNING] Methode 1 echouee: {e1}")
+        # Essayer plusieurs méthodes pour trouver le bouton CSV
+        csv_locators = [
+            ("classes exactes", By.CSS_SELECTOR, "button.GJALL4ABCV.GJALL4ABLW"),
+            ("texte CSV", By.XPATH, "//button[contains(text(), 'CSV')]"),
+            ("classe partielle", By.CSS_SELECTOR, "button.GJALL4ABCV"),
+            ("aria-label", By.CSS_SELECTOR, "button[aria-label*='CSV']"),
+            ("texte dans span", By.XPATH, "//button[.//span[contains(text(), 'CSV')]]"),
+        ]
 
-            # Méthode 2: Par le texte "CSV"
+        csv_clicked = False
+        for locator_name, by_method, selector in csv_locators:
             try:
-                csv_button = driver.find_element(By.XPATH, "//button[contains(text(), 'CSV')]")
+                # Utiliser short_wait pour ne pas bloquer trop longtemps
+                csv_button = short_wait.until(EC.element_to_be_clickable((by_method, selector)))
                 csv_button.click()
-                print("[OK] Clic sur bouton CSV reussi (methode 2)")
-                time.sleep(10)
-            except NoSuchElementException as e2:
-                print(f"[WARNING] Methode 2 echouee: {e2}")
+                print(f"[OK] Clic sur bouton CSV reussi ({locator_name})")
+                csv_clicked = True
+                time.sleep(10)  # Attendre le téléchargement
+                break
+            except (TimeoutException, NoSuchElementException):
+                print(f"[WARNING] Methode '{locator_name}' echouee")
+            except WebDriverException as e:
+                print(f"[WARNING] Erreur WebDriver avec '{locator_name}': {e}")
 
-                # Méthode 3: Par classe partielle
-                try:
-                    csv_button = driver.find_element(By.CSS_SELECTOR, "button.GJALL4ABCV")
-                    csv_button.click()
-                    print("[OK] Clic sur bouton CSV reussi (methode 3)")
-                    time.sleep(10)
-                except NoSuchElementException as e3:
-                    print(f"[ERREUR] Impossible de trouver le bouton CSV: {e3}")
-                    return None
+        if not csv_clicked:
+            print("[ERREUR] Impossible de trouver le bouton CSV avec aucune methode")
+            # Sauvegarder un screenshot pour debug
+            try:
+                screenshot_path = "/tmp/csv_button_not_found.png"
+                driver.save_screenshot(screenshot_path)
+                print(f"[DEBUG] Screenshot sauvegarde: {screenshot_path}")
+            except Exception:
+                pass
+            return None
 
         # ÉTAPE 5: Vérifier le téléchargement
         print("[ETAPE 5] Verification du telechargement...")

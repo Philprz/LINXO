@@ -61,7 +61,10 @@ EXCLUSIONS = {
         'Prél. carte débit différé',
         'Prél. carte debit differe',
         'Virements internes',
-    ]
+    ],
+    'marchands_internes': [
+        r'AMAZON\s+PAYMENTS',
+    ],
 }
 
 # Exceptions pour les dépenses récurrentes qui doivent rester variables
@@ -121,6 +124,11 @@ def doit_exclure_transaction(libelle, categorie="", notes="", montant=0.0):
             for montant_preauth in montants_suspects:
                 if abs(montant_abs - montant_preauth) < 0.01:  # Tolérance de 1 centime
                     return True, f"Preautorisation carburant ({montant_preauth}E)"
+
+    # Vérifier les marchands à exclure (dépenses internes)
+    for pattern in EXCLUSIONS['marchands_internes']:
+        if re.search(pattern, libelle_upper, re.IGNORECASE):
+            return True, "Transaction interne (marchand exclu)"
 
     return False, None
 
