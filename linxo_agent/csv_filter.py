@@ -43,6 +43,7 @@ def filter_csv_by_month(
         print(f"[FILTER] Fichier source: {input_csv}")
 
         # Lire le CSV
+        fieldnames = None  # Sauvegarder les noms de colonnes
         with open(input_csv, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f, delimiter=';')
 
@@ -51,6 +52,9 @@ def filter_csv_by_month(
                 print(f"[ERREUR] Colonne '{date_column}' non trouvée dans le CSV")
                 print(f"[INFO] Colonnes disponibles: {', '.join(reader.fieldnames)}")
                 return None
+
+            # SAUVEGARDER les fieldnames AVANT de fermer le fichier
+            fieldnames = reader.fieldnames
 
             # Filtrer les lignes
             filtered_rows = []
@@ -82,7 +86,7 @@ def filter_csv_by_month(
 
         # Écrire le fichier filtré
         with open(output_csv, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=reader.fieldnames, delimiter=';')
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=';')
             writer.writeheader()
             writer.writerows(filtered_rows)
 
