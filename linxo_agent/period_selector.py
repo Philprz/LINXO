@@ -25,6 +25,75 @@ class PeriodSelector:
         self.driver = driver
         self.wait = wait
 
+    def _try_select_with_javascript(self, select_element, identifier):
+        """
+        Essaie de sélectionner 'Ce mois-ci' via JavaScript sur un élément select
+
+        Args:
+            select_element: L'élément select
+            identifier: Identifiant pour le logging (nom ou numéro)
+
+        Returns:
+            bool: True si succès, False sinon
+        """
+        try:
+            # Créer l'objet Select pour récupérer les options
+            select_obj = Select(select_element)
+
+            # Afficher les options disponibles
+            print(f"    [INFO] Options disponibles dans {identifier}:")
+            for opt in select_obj.options:
+                marker = " [CURRENT]" if opt.is_selected() else ""
+                print(f"      - '{opt.text}' (value='{opt.get_attribute('value')}'){marker}")
+
+            # Chercher l'option qui correspond à "Ce mois-ci"
+            target_option = None
+            for option in select_obj.options:
+                option_value = option.get_attribute('value')
+                option_text = option.text.strip()
+
+                # Essayer de matcher par value=3 ou par texte
+                if option_value == '3' or 'mois' in option_text.lower():
+                    target_option = option
+                    print(f"    [INFO] Option trouvee: '{option_text}' (value={option_value})")
+                    break
+
+            if not target_option:
+                print(f"    [WARNING] Aucune option 'Ce mois-ci' trouvee dans {identifier}")
+                return False
+
+            # Méthode 1: Sélection JavaScript directe avec déclenchement d'événements
+            print(f"    [INFO] Tentative de selection JavaScript...")
+            success = self.driver.execute_script("""
+                var select = arguments[0];
+                var option = arguments[1];
+
+                // Changer la sélection
+                select.value = option.value;
+                option.selected = true;
+
+                // Déclencher les événements pour notifier l'application
+                var events = ['change', 'input', 'click'];
+                events.forEach(function(eventType) {
+                    var event = new Event(eventType, { bubbles: true, cancelable: true });
+                    select.dispatchEvent(event);
+                });
+
+                return select.value === option.value;
+            """, select_element, target_option)
+
+            if success:
+                print(f"    [SUCCESS] Selection JavaScript reussie pour {identifier}")
+                time.sleep(2)
+                return True
+            else:
+                print(f"    [WARNING] Selection JavaScript echouee pour {identifier}")
+                return False
+
+        except Exception as e:
+            print(f"    [ERROR] Erreur JavaScript pour {identifier}: {e}")
+            return False
+
     def click_advanced_search(self):
         """
         Clique sur "Recherche avancée" avec plusieurs méthodes de fallback
@@ -74,7 +143,7 @@ class PeriodSelector:
                     self.driver.execute_script("arguments[0].click();", element)
 
                 print(f"  [SUCCESS] Clic reussi: {method['name']}")
-                time.sleep(2)
+                time.sleep(5)  # Augmenté de 2 à 5 secondes pour laisser l'UI se charger
                 return True
 
             except (TimeoutException, NoSuchElementException) as e:
@@ -104,6 +173,11 @@ class PeriodSelector:
                 'locator': (By.CSS_SELECTOR, "div.GJYWTJUCBY > select"),
             },
             {
+                'name': 'Tous les selects dans la page',
+                'locator': (By.TAG_NAME, "select"),
+                'try_all': True
+            },
+            {
                 'name': 'Select avec option "Ce mois-ci"',
                 'locator': (By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
             },
@@ -123,7 +197,25 @@ class PeriodSelector:
                 print(f"  [Tentative] {method['name']}")
 
                 # Trouver le select
-                if method.get('filter_visible'):
+                if method.get('try_all'):
+                    # Essayer tous les selects de la page
+                    elements = self.driver.find_elements(*method['locator'])
+                    print(f"    [INFO] {len(elements)} select(s) trouve(s) dans la page")
+
+                    for idx, elem in enumerate(elements):
+                        try:
+                            print(f"    [INFO] Tentative sur select #{idx+1}...")
+                            # Essayer de forcer la sélection via JavaScript même si non visible
+                            if self._try_select_with_javascript(elem, idx+1):
+                                return True
+                        except Exception as e:
+                            print(f"    [WARNING] Select #{idx+1} echoue: {e}")
+                            continue
+
+                    print(f"    [WARNING] Aucun select n'a fonctionne")
+                    continue
+
+                elif method.get('filter_visible'):
                     # Trouver tous les selects et filtrer les visibles
                     elements = self.driver.find_elements(*method['locator'])
                     select_element = None
@@ -143,9 +235,18 @@ class PeriodSelector:
                         EC.presence_of_element_located(method['locator'])
                     )
 
-                # Vérifier que l'élément est visible
+                # Essayer de rendre l'élément visible en scrollant vers lui
+                try:
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", select_element)
+                    time.sleep(0.5)
+                except Exception:
+                    pass
+
+                # Si l'élément n'est pas visible, essayer JavaScript directement
                 if not select_element.is_displayed():
-                    print(f"    [WARNING] Element trouve mais non visible")
+                    print(f"    [WARNING] Element trouve mais non visible - tentative JavaScript...")
+                    if self._try_select_with_javascript(select_element, method['name']):
+                        return True
                     continue
 
                 # Créer l'objet Select
