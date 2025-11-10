@@ -244,7 +244,9 @@
 
         <div class="content">
             <div class="metric">
-                <span class="metric-label">Frais fixes</span>
+                <a href="{{ index_url }}" style="text-decoration: none; color: inherit; border-bottom: 1px dashed #007bff;">
+                    <span class="metric-label">Frais fixes 🔗</span>
+                </a>
                 <span class="metric-value value-red">{{ "%.2f"|format(total_fixes) }} €</span>
                 <span class="metric-label">/ {{ budget_fixes_prevu }} €</span>
             </div>
@@ -262,7 +264,9 @@
             </div>
 
             <div class="metric">
-                <span class="metric-label">Dépenses variables</span>
+                <a href="{{ index_url }}" style="text-decoration: none; color: inherit; border-bottom: 1px dashed #007bff;">
+                    <span class="metric-label">Dépenses variables 🔗</span>
+                </a>
                 <span class="metric-value value-red">{{ "%.2f"|format(total_variables) }} €</span>
                 <span class="metric-label">/ {{ budget_max }} €</span>
             </div>

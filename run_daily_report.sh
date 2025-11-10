@@ -33,8 +33,19 @@ source "$VENV_PATH/bin/activate" || {
     exit 1
 }
 
-# Exécuter le script d'analyse
-echo "🚀 Lancement de l'analyse..."
+# ÉTAPE 1: Télécharger le CSV depuis Linxo
+echo "📥 Téléchargement du CSV depuis Linxo..."
+python linxo_agent.py --skip-notifications
+
+# Vérifier si le téléchargement a réussi
+if [ $? -ne 0 ]; then
+    echo "❌ Échec du téléchargement du CSV"
+    echo "⚠️  Aucun rapport ne sera envoyé (alerte technique envoyée si configurée)"
+    exit 1
+fi
+
+# ÉTAPE 2: Analyser et envoyer le rapport
+echo "🚀 Lancement de l'analyse et envoi du rapport..."
 python linxo_agent/run_analysis.py
 
 # Vérifier le code de retour

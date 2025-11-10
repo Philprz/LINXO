@@ -791,7 +791,8 @@ def telecharger_csv_linxo(driver, wait):
         ]
 
         # Créer un wait plus court pour cette étape spécifique
-        short_wait = WebDriverWait(driver, 5)
+        # Augmenté de 5s à 10s pour améliorer la robustesse sur VPS
+        short_wait = WebDriverWait(driver, 10)
         recherche_avancee_clicked = False
 
         for locator_name, locator in advanced_search_locators:
@@ -908,19 +909,30 @@ def telecharger_csv_linxo(driver, wait):
         ]
 
         csv_clicked = False
-        for locator_name, by_method, selector in csv_locators:
-            try:
-                # Utiliser short_wait pour ne pas bloquer trop longtemps
-                csv_button = short_wait.until(EC.element_to_be_clickable((by_method, selector)))
-                csv_button.click()
-                print(f"[OK] Clic sur bouton CSV reussi ({locator_name})")
-                csv_clicked = True
-                time.sleep(10)  # Attendre le téléchargement
-                break
-            except (TimeoutException, NoSuchElementException):
-                print(f"[WARNING] Methode '{locator_name}' echouee")
-            except WebDriverException as e:
-                print(f"[WARNING] Erreur WebDriver avec '{locator_name}': {e}")
+        max_retries = 3
+        retry_count = 0
+
+        while not csv_clicked and retry_count < max_retries:
+            if retry_count > 0:
+                print(f"[RETRY] Tentative {retry_count + 1}/{max_retries}...")
+                time.sleep(2)  # Pause avant retry
+
+            for locator_name, by_method, selector in csv_locators:
+                try:
+                    # Utiliser short_wait pour ne pas bloquer trop longtemps
+                    csv_button = short_wait.until(EC.element_to_be_clickable((by_method, selector)))
+                    csv_button.click()
+                    print(f"[OK] Clic sur bouton CSV reussi ({locator_name})")
+                    csv_clicked = True
+                    time.sleep(15)  # Augmenté de 10s à 15s pour VPS plus lents
+                    break
+                except (TimeoutException, NoSuchElementException):
+                    print(f"[WARNING] Methode '{locator_name}' echouee")
+                except WebDriverException as e:
+                    print(f"[WARNING] Erreur WebDriver avec '{locator_name}': {e}")
+
+            if not csv_clicked:
+                retry_count += 1
 
         if not csv_clicked:
             print("[ERREUR] Impossible de trouver le bouton CSV avec aucune methode")
@@ -935,9 +947,21 @@ def telecharger_csv_linxo(driver, wait):
 
         # ÉTAPE 5: Vérifier le téléchargement
         print("[ETAPE 5] Verification du telechargement...")
-        time.sleep(5)
 
-        csv_files = list(config.downloads_dir.glob("*.csv"))
+        # Attendre que le fichier apparaisse (avec polling)
+        csv_files = []
+        max_wait = 20  # Augmenté de 5s à 20s total
+        wait_interval = 2
+        elapsed = 0
+
+        while not csv_files and elapsed < max_wait:
+            time.sleep(wait_interval)
+            elapsed += wait_interval
+            csv_files = list(config.downloads_dir.glob("*.csv"))
+            if csv_files:
+                print(f"[OK] Fichier CSV detecte apres {elapsed}s")
+                break
+            print(f"[ATTENTE] Fichier CSV non detecte, attente... ({elapsed}s/{max_wait}s)")
 
         if csv_files:
             # Prendre le fichier le plus récent

@@ -120,6 +120,32 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                     results['csv_path'] = str(csv_path)
                 else:
                     print("[ERREUR] Echec du telechargement du CSV")
+
+                    # Envoyer une alerte technique
+                    try:
+                        notification_manager = NotificationManager()
+                        notification_manager.send_technical_alert(
+                            error_type="Échec de téléchargement du CSV depuis Linxo",
+                            error_message="""Le téléchargement du CSV depuis Linxo a échoué.
+
+Causes possibles:
+1. Interface Linxo modifiée (sélecteurs CSS/boutons changés)
+2. Problème de connexion ou timeout
+3. Authentification échouée
+4. Bouton CSV non trouvé sur la page
+
+Actions recommandées:
+1. Vérifier les screenshots d'erreur sur le VPS: /tmp/csv_button_not_found.png
+2. Consulter les logs: ~/LINXO/logs/daily_report_*.log
+3. Tester manuellement: python linxo_agent.py --skip-notifications
+
+Aucun rapport budget n'a été envoyé pour éviter l'utilisation de données obsolètes.
+"""
+                        )
+                        print("[INFO] Alerte technique envoyée")
+                    except Exception as alert_error:
+                        print(f"[WARNING] Impossible d'envoyer l'alerte technique: {alert_error}")
+
                     return results
 
             except DOWNLOAD_ERRORS as error:
@@ -454,7 +480,11 @@ def main():
     )
 
     # Code de sortie
-    if results['analysis_success']:
+    # Si download_success est False, c'est une erreur fatale
+    if not results['download_success']:
+        print("\n[ERREUR] Execution terminee: echec du telechargement CSV")
+        return 1
+    elif results['analysis_success']:
         print("\n[SUCCESS] Execution terminee avec succes!")
         return 0
     else:

@@ -583,6 +583,9 @@ class NotificationManager:
                         float(d.get("montant", 0) or 0)  # type: ignore[call-arg]
                         for d in depenses_fixes_ref
                     )
+                    # Si sum() retourne 0 (liste vide), utiliser le fallback
+                    if budget_fixes_prevu == 0:
+                        budget_fixes_prevu = 3271.0  # Fallback (mise à jour 2025)
                 except Exception:  # pylint: disable=broad-except
                     budget_fixes_prevu = 3271.0  # Fallback (mise à jour 2025)
 
