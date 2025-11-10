@@ -33,6 +33,7 @@ class PeriodSelector:
     def __init__(self, driver, wait):
         self.driver = driver
         self.wait = wait
+        self._last_dropdown_element = None
 
     def _find_period_dropdown(self):
         """Retourne le premier select affichant la période"""
@@ -142,6 +143,7 @@ class PeriodSelector:
 
             if selected_value == "3" or "mois" in selected_text.lower():
                 print(f"    [SUCCESS] {identifier}: 'Ce mois-ci' est actif (value={selected_value}, text='{selected_text}')")
+                self._last_dropdown_element = dropdown_element
                 return True
 
             print(f"    [WARNING] {identifier}: valeur selectionnee inattendue (value={selected_value}, text='{selected_text}')")
@@ -184,9 +186,73 @@ class PeriodSelector:
 
         if value == "3":
             print("    [SUCCESS] Selection clavier confirmee (value=3)")
+            self._last_dropdown_element = dropdown_element
             return True
 
         print(f"    [WARNING] Selection clavier non confirme (value={value})")
+        return False
+
+    def _collect_validation_buttons_near_dropdown(self):
+        """Retourne les boutons proches du select (panneau Recherche avancée)."""
+        buttons = []
+        root = self._last_dropdown_element
+
+        if not root:
+            return buttons
+
+        locator_defs = [
+            (By.XPATH, "./ancestor::div[contains(@class,'GJYWTJUCBY') or contains(@class,'GJYWTJUCFU')][1]//button"),
+            (By.XPATH, "./ancestor::div[contains(@class,'GJYWTJUCFU')][1]//button[contains(@class,'GJYWTJUCEV')]")
+        ]
+
+        seen = set()
+
+        for by_method, query in locator_defs:
+            try:
+                elems = root.find_elements(by_method, query)
+            except (NoSuchElementException, StaleElementReferenceException):
+                continue
+
+            for elem in elems:
+                try:
+                    elem_id = elem.id
+                except StaleElementReferenceException:
+                    continue
+
+                if elem_id in seen:
+                    continue
+                seen.add(elem_id)
+                buttons.append(elem)
+
+        return buttons
+
+    def _click_button_element(self, button, context):
+        """Clique un bouton en gérant les cas d'interaction"""
+        try:
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+        try:
+            if button.is_enabled() and button.is_displayed():
+                button.click()
+            else:
+                raise ElementNotInteractableException("Bouton non cliquable directement")
+            print(f"  [SUCCESS] Bouton clique: {context}")
+            time.sleep(5)
+            return True
+        except (ElementClickInterceptedException, ElementNotInteractableException):
+            try:
+                self.driver.execute_script("arguments[0].click();", button)
+                print(f"  [SUCCESS] Bouton clique via JS: {context}")
+                time.sleep(5)
+                return True
+            except Exception as e:
+                print(f"    [WARNING] Clic impossible ({context}): {e}")
+        except StaleElementReferenceException:
+            print(f"    [WARNING] Bouton stale ({context})")
+
         return False
 
     def _try_select_with_javascript(self, select_element, identifier):
@@ -249,6 +315,7 @@ class PeriodSelector:
             if success:
                 print(f"    [SUCCESS] Selection JavaScript reussie pour {identifier}")
                 time.sleep(2)
+                self._last_dropdown_element = select_element
                 return True
             else:
                 print(f"    [WARNING] Selection JavaScript echouee pour {identifier}")
@@ -436,6 +503,11 @@ class PeriodSelector:
         """
         print("[PERIOD] Recherche du bouton de validation...")
 
+        nearby_buttons = self._collect_validation_buttons_near_dropdown()
+        for idx, button in enumerate(nearby_buttons, start=1):
+            if self._click_button_element(button, f"Bouton proche du select #{idx}"):
+                return True
+
         # Méthodes pour trouver le bouton
         button_methods = [
             {
@@ -479,20 +551,9 @@ class PeriodSelector:
         for method in button_methods:
             try:
                 print(f"  [Tentative] {method['name']}")
-
-                button = self.wait.until(EC.element_to_be_clickable(method['locator']))
-
-                # Tenter un clic normal
-                try:
-                    button.click()
-                except (ElementClickInterceptedException, ElementNotInteractableException):
-                    # Fallback: clic JavaScript
-                    print(f"    [Fallback] Clic JavaScript")
-                    self.driver.execute_script("arguments[0].click();", button)
-
-                print(f"  [SUCCESS] Bouton clique: {method['name']}")
-                time.sleep(5)  # Attendre le rafraîchissement de la page
-                return True
+                button = self.wait.until(EC.presence_of_element_located(method['locator']))
+                if self._click_button_element(button, method['name']):
+                    return True
 
             except (TimeoutException, NoSuchElementException) as e:
                 print(f"    [WARNING] Methode echouee: {type(e).__name__}")
