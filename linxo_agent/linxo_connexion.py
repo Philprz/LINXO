@@ -818,6 +818,9 @@ def telecharger_csv_linxo(driver, wait):
         max_retries = 3
         retry_count = 0
 
+        # Créer un WebDriverWait avec timeout court pour les tentatives multiples
+        short_wait = WebDriverWait(driver, 5)
+
         while not csv_clicked and retry_count < max_retries:
             if retry_count > 0:
                 print(f"[RETRY] Tentative {retry_count + 1}/{max_retries}...")
