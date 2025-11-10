@@ -119,34 +119,16 @@ def run_full_workflow(skip_download=False, skip_notifications=False, csv_file=No
                     results['download_success'] = True
                     results['csv_path'] = str(csv_path)
                 else:
-                    print("[ERREUR] Echec du telechargement du CSV")
+                    print("[ERREUR] Echec du telechargement/filtrage du CSV")
+                    print("[DIAGNOSTIC] Lancement du diagnostic synchrone pour corriger le problème...")
 
-                    # Envoyer une alerte technique
-                    try:
-                        notification_manager = NotificationManager()
-                        notification_manager.send_technical_alert(
-                            error_type="Échec de téléchargement du CSV depuis Linxo",
-                            error_message="""Le téléchargement du CSV depuis Linxo a échoué.
+                    # Note: le driver sera fermé dans le finally, mais on va en créer un nouveau si besoin
 
-Causes possibles:
-1. Interface Linxo modifiée (sélecteurs CSS/boutons changés)
-2. Problème de connexion ou timeout
-3. Authentification échouée
-4. Bouton CSV non trouvé sur la page
+                    # Marquer qu'un diagnostic est nécessaire
+                    results['diagnostic_needed'] = True
 
-Actions recommandées:
-1. Vérifier les screenshots d'erreur sur le VPS: /tmp/csv_button_not_found.png
-2. Consulter les logs: ~/LINXO/logs/daily_report_*.log
-3. Tester manuellement: python linxo_agent.py --skip-notifications
+                    # Pas de return ici, on va gérer la suite après le finally
 
-Aucun rapport budget n'a été envoyé pour éviter l'utilisation de données obsolètes.
-"""
-                        )
-                        print("[INFO] Alerte technique envoyée")
-                    except Exception as alert_error:
-                        print(f"[WARNING] Impossible d'envoyer l'alerte technique: {alert_error}")
-
-                    return results
 
             except DOWNLOAD_ERRORS as error:
                 print(f"[ERREUR] Erreur durant le telechargement: {error}")
@@ -186,6 +168,121 @@ Aucun rapport budget n'a été envoyé pour éviter l'utilisation de données ob
                 results['csv_path'] = str(config.get_latest_csv())
 
             results['download_success'] = True
+
+        # ÉTAPE 1.5: Si diagnostic nécessaire, lancer et ré-essayer
+        if results.get('diagnostic_needed'):
+            print("\n" + "=" * 80)
+            print("ETAPE 1.5: DIAGNOSTIC ET CORRECTION AUTO")
+            print("=" * 80)
+
+            try:
+                # Lancer le diagnostic synchrone
+                print("[DIAGNOSTIC] Execution du diagnostic...")
+                from run_diagnostic_sync import run_diagnostic_and_fix
+
+                diag_success, diag_message = run_diagnostic_and_fix()
+
+                if diag_success:
+                    print(f"[SUCCESS] {diag_message}")
+                    print("[RETRY] Relance du telechargement avec les selecteurs corriges...")
+
+                    # Ré-essayer le téléchargement complet
+                    driver = None
+                    user_data_dir = None
+
+                    try:
+                        driver, wait, user_data_dir = initialiser_driver_linxo()
+
+                        # Se connecter à Linxo
+                        connexion_ok = se_connecter_linxo(driver, wait)
+
+                        if not connexion_ok:
+                            print("[ERREUR] Echec de la reconnexion a Linxo")
+                            raise RuntimeError("Reconnexion échouée")
+
+                        # Télécharger le CSV
+                        csv_path = telecharger_csv_linxo(driver, wait)
+
+                        if csv_path and Path(csv_path).exists():
+                            print(f"[SUCCESS] CSV telecharge apres correction: {csv_path}")
+                            results['download_success'] = True
+                            results['csv_path'] = str(csv_path)
+                            results['auto_fix_success'] = True
+                            results['auto_fix_message'] = diag_message
+                        else:
+                            print("[ERREUR] Echec persistant du telechargement apres correction")
+                            raise RuntimeError("Téléchargement échoué après correction")
+
+                    finally:
+                        # Cleanup
+                        if driver:
+                            with suppress(*QUIT_ERRORS):
+                                driver.quit()
+
+                        if user_data_dir and user_data_dir.exists():
+                            try:
+                                shutil.rmtree(user_data_dir, ignore_errors=True)
+                            except (OSError, PermissionError):
+                                pass
+
+                else:
+                    print(f"[ERREUR] Diagnostic echoue: {diag_message}")
+                    print("[CRITIQUE] Impossible de corriger automatiquement le probleme")
+
+                    # Envoyer alerte critique
+                    try:
+                        notification_manager = NotificationManager()
+                        notification_manager.send_critical_alert(
+                            error_type="Échec du téléchargement CSV et du diagnostic auto",
+                            error_message=f"""Le téléchargement du CSV a échoué et le diagnostic automatique n'a pas pu corriger le problème.
+
+Diagnostic:
+{diag_message}
+
+Causes possibles:
+1. Interface Linxo modifiée (sélecteurs introuvables)
+2. Problème de connexion persistant
+3. Authentification échouée
+4. Changement majeur de l'interface
+
+AUCUN rapport budget n'a été envoyé.
+""",
+                            diagnostic_result=diag_message
+                        )
+                        print("[ALERTE] Alerte critique envoyee")
+                    except Exception as alert_error:
+                        print(f"[WARNING] Impossible d'envoyer l'alerte critique: {alert_error}")
+
+                    return results
+
+            except Exception as diag_error:
+                print(f"[ERREUR] Erreur durant le diagnostic: {diag_error}")
+                traceback.print_exc()
+
+                # Envoyer alerte critique
+                try:
+                    notification_manager = NotificationManager()
+                    notification_manager.send_critical_alert(
+                        error_type="Erreur critique durant le diagnostic",
+                        error_message=f"""Une erreur critique s'est produite durant le diagnostic automatique.
+
+Erreur: {str(diag_error)}
+
+Le système est hors service.
+AUCUN rapport budget n'a été envoyé.
+""",
+                        diagnostic_result=str(diag_error)
+                    )
+                    print("[ALERTE] Alerte critique envoyee")
+                except Exception as alert_error:
+                    print(f"[WARNING] Impossible d'envoyer l'alerte critique: {alert_error}")
+
+                return results
+
+        # Vérifier qu'on a bien un CSV avant de continuer
+        if not results['download_success'] or not results.get('csv_path'):
+            print("[ERREUR] Aucun CSV disponible pour l'analyse")
+            return results
 
         # ÉTAPE 2: Analyse des dépenses
         print("\n" + "=" * 80)
@@ -317,6 +414,41 @@ Aucun rapport budget n'a été envoyé pour éviter l'utilisation de données ob
             print("\n[INFO] Envoi des notifications saute")
             # Considéré comme succès car sauté volontairement
             results['notification_success'] = True
+
+        # Envoyer notification INFO si le système a auto-corrigé un problème
+        if results.get('auto_fix_success'):
+            print("\n" + "=" * 80)
+            print("NOTIFICATION INFO: Probleme auto-corrige")
+            print("=" * 80)
+
+            try:
+                notification_manager = NotificationManager()
+                notification_manager.send_auto_fix_notification(
+                    problem_description="""Le téléchargement initial du CSV a échoué en raison d'un problème avec la sélection de période sur l'interface Linxo.
+
+Symptômes détectés:
+- Les sélecteurs CSS pour "Recherche avancée" ou "Ce mois-ci" ne fonctionnaient plus
+- L'interface Linxo a probablement été mise à jour
+- Le téléchargement direct du CSV du mois courant a échoué""",
+                    fix_description=f"""Le système a automatiquement diagnostiqué et corrigé le problème:
+
+1. Analyse HTML de la page Linxo effectuée
+2. Nouveaux sélecteurs fonctionnels identifiés
+3. Code auto-corrigé dans period_selector.py
+4. Téléchargement CSV réussi après correction
+5. Analyse budget complétée avec succès
+
+Résultat du diagnostic:
+{results.get('auto_fix_message', 'Correction automatique appliquée')}
+
+✅ Le rapport budget a été généré et envoyé normalement.
+✅ Les prochaines exécutions utiliseront les nouveaux sélecteurs."""
+                )
+                print("[SUCCESS] Notification INFO envoyee")
+
+            except Exception as e:
+                print(f"[WARNING] Impossible d'envoyer la notification INFO: {e}")
+                traceback.print_exc()
 
         # RÉSUMÉ FINAL
         print("\n" + "=" * 80)

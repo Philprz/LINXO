@@ -848,6 +848,437 @@ Cette alerte a été générée automatiquement par Linxo Agent
             LOGGER.exception("Erreur lors de l'envoi de l'alerte technique: %s", exc)
             return False
 
+    def send_auto_fix_notification(
+        self,
+        problem_description: str,
+        fix_description: str,
+        alert_email: str = "phiperez@gmail.com",
+    ) -> bool:
+        """
+        Envoie une notification INFO quand un problème a été résolu automatiquement.
+
+        Args:
+            problem_description: Description du problème rencontré
+            fix_description: Description de la correction automatique appliquée
+            alert_email: Email de destination (par défaut phiperez@gmail.com)
+
+        Returns:
+            bool: True si la notification a été envoyée
+        """
+        from datetime import datetime as _dt
+
+        subject = f"ℹ️ INFO - Linxo Agent - Problème résolu automatiquement"
+
+        body_text = f"""NOTIFICATION INFO - LINXO AGENT
+{'=' * 80}
+
+Statut: PROBLÈME RÉSOLU AUTOMATIQUEMENT
+Date/Heure: {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+{'=' * 80}
+PROBLÈME RENCONTRÉ
+{'=' * 80}
+
+{problem_description}
+
+{'=' * 80}
+CORRECTION APPLIQUÉE
+{'=' * 80}
+
+{fix_description}
+
+{'=' * 80}
+RÉSULTAT
+{'=' * 80}
+
+✅ Le système a corrigé automatiquement le problème.
+✅ L'analyse des dépenses a été effectuée avec succès.
+✅ Le rapport budget a été envoyé normalement.
+
+PROCHAINE EXÉCUTION:
+Le système utilisera automatiquement les corrections appliquées.
+Le problème ne devrait plus se reproduire.
+
+---
+Cette notification a été générée automatiquement par Linxo Agent
+"""
+
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .info-box {{
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 20px;
+            margin: 20px 0;
+        }}
+        .success-box {{
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+        }}
+        .title {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #17a2b8;
+            margin-bottom: 10px;
+        }}
+        .datetime {{
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }}
+        .section {{
+            margin: 20px 0;
+        }}
+        .section-title {{
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }}
+        .description {{
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }}
+        .checkmark {{
+            color: #28a745;
+            margin-right: 10px;
+        }}
+        ul {{
+            list-style: none;
+            padding-left: 0;
+        }}
+        ul li {{
+            padding: 5px 0;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #666;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="info-box">
+        <div class="title">ℹ️ INFO - LINXO AGENT</div>
+        <div class="datetime">Date/Heure: {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+        <p><strong>Statut:</strong> PROBLÈME RÉSOLU AUTOMATIQUEMENT</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Problème rencontré</div>
+        <div class="description">{problem_description}</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Correction appliquée</div>
+        <div class="description">{fix_description}</div>
+    </div>
+
+    <div class="success-box">
+        <div class="section-title">✅ Résultat</div>
+        <ul>
+            <li><span class="checkmark">✅</span>Le système a corrigé automatiquement le problème</li>
+            <li><span class="checkmark">✅</span>L'analyse des dépenses a été effectuée avec succès</li>
+            <li><span class="checkmark">✅</span>Le rapport budget a été envoyé normalement</li>
+        </ul>
+        <p><strong>Prochaine exécution:</strong><br>
+        Le système utilisera automatiquement les corrections appliquées.<br>
+        Le problème ne devrait plus se reproduire.</p>
+    </div>
+
+    <div class="footer">
+        Cette notification a été générée automatiquement par Linxo Agent
+    </div>
+</body>
+</html>"""
+
+        try:
+            result = self.send_email(
+                subject=subject,
+                body_text=body_text,
+                html_body=html_body,
+                recipients=[alert_email],
+            )
+
+            if result:
+                LOGGER.info("Notification auto-fix envoyée à %s", alert_email)
+            else:
+                LOGGER.error("Échec de l'envoi de la notification auto-fix à %s", alert_email)
+
+            return result
+
+        except Exception as exc:  # pylint: disable=broad-except
+            LOGGER.exception("Erreur lors de l'envoi de la notification auto-fix: %s", exc)
+            return False
+
+    def send_critical_alert(
+        self,
+        error_type: str,
+        error_message: str,
+        diagnostic_result: str = "",
+        alert_email: str = "phiperez@gmail.com",
+    ) -> bool:
+        """
+        Envoie une alerte CRITIQUE quand le système est planté et nécessite intervention.
+
+        Args:
+            error_type: Type d'erreur critique
+            error_message: Message détaillé de l'erreur
+            diagnostic_result: Résultat du diagnostic (si disponible)
+            alert_email: Email de destination (par défaut phiperez@gmail.com)
+
+        Returns:
+            bool: True si l'alerte a été envoyée
+        """
+        from datetime import datetime as _dt
+
+        subject = f"🚨 ALERTE CRITIQUE - Linxo Agent - INTERVENTION REQUISE - {error_type}"
+
+        diagnostic_section = ""
+        if diagnostic_result:
+            diagnostic_section = f"""
+{'=' * 80}
+RÉSULTAT DU DIAGNOSTIC AUTOMATIQUE
+{'=' * 80}
+
+{diagnostic_result}
+"""
+
+        body_text = f"""🚨 ALERTE CRITIQUE - LINXO AGENT 🚨
+{'=' * 80}
+
+⚠️ INTERVENTION MANUELLE REQUISE ⚠️
+
+Type d'erreur: {error_type}
+Date/Heure: {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}
+Statut: SYSTÈME PLANTÉ
+
+{'=' * 80}
+DESCRIPTION DE L'ERREUR
+{'=' * 80}
+
+{error_message}
+{diagnostic_section}
+{'=' * 80}
+🚨 ACTION IMMÉDIATE REQUISE 🚨
+{'=' * 80}
+
+Le système Linxo Agent est actuellement HORS SERVICE.
+AUCUN rapport budget n'a été généré.
+
+Étapes de dépannage:
+
+1. DIAGNOSTIC
+   - Connectez-vous au VPS: ssh linxo@vps
+   - Consultez les logs: ~/LINXO/logs/daily_report_*.log
+   - Vérifiez les screenshots: /tmp/*.png
+
+2. VÉRIFICATIONS
+   - Testez la connexion Linxo manuellement
+   - Vérifiez que Chrome/ChromeDriver fonctionnent
+   - Testez le téléchargement CSV: python linxo_agent.py --skip-notifications
+
+3. CORRECTION
+   - Si l'interface Linxo a changé: examinez les fichiers HTML dans ~/LINXO/diagnostic_html/
+   - Mettez à jour les sélecteurs si nécessaire
+   - Relancez le système après correction
+
+4. VALIDATION
+   - python linxo_agent.py --skip-notifications
+   - Vérifiez que le rapport est généré correctement
+
+---
+⚠️ CETTE ALERTE NÉCESSITE UNE INTERVENTION HUMAINE ⚠️
+"""
+
+        html_diagnostic = ""
+        if diagnostic_result:
+            html_diagnostic = f"""
+    <div class="section">
+        <div class="section-title">Résultat du diagnostic automatique</div>
+        <div class="description">{diagnostic_result}</div>
+    </div>
+"""
+
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .critical-box {{
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+        }}
+        .title {{
+            font-size: 26px;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 10px;
+        }}
+        .warning {{
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #856404;
+        }}
+        .datetime {{
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }}
+        .section {{
+            margin: 20px 0;
+        }}
+        .section-title {{
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }}
+        .description {{
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }}
+        .action-box {{
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+        }}
+        ol {{
+            margin-left: 20px;
+        }}
+        code {{
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #666;
+            font-size: 12px;
+            text-align: center;
+        }}
+    </style>
+</head>
+<body>
+    <div class="critical-box">
+        <div class="title">🚨 ALERTE CRITIQUE - LINXO AGENT</div>
+        <div class="datetime">Date/Heure: {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+        <p><strong>Type d'erreur:</strong> {error_type}</p>
+        <p><strong>Statut:</strong> SYSTÈME PLANTÉ</p>
+    </div>
+
+    <div class="warning">
+        ⚠️ INTERVENTION MANUELLE REQUISE ⚠️
+    </div>
+
+    <div class="section">
+        <div class="section-title">Description de l'erreur</div>
+        <div class="description">{error_message}</div>
+    </div>
+{html_diagnostic}
+    <div class="action-box">
+        <div class="section-title">🚨 Action immédiate requise</div>
+        <p><strong>Le système Linxo Agent est actuellement HORS SERVICE.</strong><br>
+        AUCUN rapport budget n'a été généré.</p>
+
+        <h3>Étapes de dépannage:</h3>
+
+        <h4>1. DIAGNOSTIC</h4>
+        <ul>
+            <li>Connectez-vous au VPS: <code>ssh linxo@vps</code></li>
+            <li>Consultez les logs: <code>~/LINXO/logs/daily_report_*.log</code></li>
+            <li>Vérifiez les screenshots: <code>/tmp/*.png</code></li>
+        </ul>
+
+        <h4>2. VÉRIFICATIONS</h4>
+        <ul>
+            <li>Testez la connexion Linxo manuellement</li>
+            <li>Vérifiez que Chrome/ChromeDriver fonctionnent</li>
+            <li>Testez: <code>python linxo_agent.py --skip-notifications</code></li>
+        </ul>
+
+        <h4>3. CORRECTION</h4>
+        <ul>
+            <li>Si l'interface Linxo a changé: examinez <code>~/LINXO/diagnostic_html/</code></li>
+            <li>Mettez à jour les sélecteurs si nécessaire</li>
+            <li>Relancez le système après correction</li>
+        </ul>
+
+        <h4>4. VALIDATION</h4>
+        <ul>
+            <li><code>python linxo_agent.py --skip-notifications</code></li>
+            <li>Vérifiez que le rapport est généré correctement</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        <strong>⚠️ CETTE ALERTE NÉCESSITE UNE INTERVENTION HUMAINE ⚠️</strong><br>
+        Cette alerte a été générée automatiquement par Linxo Agent
+    </div>
+</body>
+</html>"""
+
+        try:
+            result = self.send_email(
+                subject=subject,
+                body_text=body_text,
+                html_body=html_body,
+                recipients=[alert_email],
+            )
+
+            if result:
+                LOGGER.info("Alerte critique envoyée à %s", alert_email)
+            else:
+                LOGGER.error("Échec de l'envoi de l'alerte critique à %s", alert_email)
+
+            return result
+
+        except Exception as exc:  # pylint: disable=broad-except
+            LOGGER.exception("Erreur lors de l'envoi de l'alerte critique: %s", exc)
+            return False
+
 
 # ---------------------------------------------------------------------------
 # Script de test manuel

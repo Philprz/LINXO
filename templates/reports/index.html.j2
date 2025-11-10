@@ -17,6 +17,19 @@
     </div>
 </div>
 
+{% if total_fixes is defined and total_variables is defined %}
+<div class="summary-card">
+    <div class="summary-item">
+        <span class="summary-label">💳 Frais récurrents (fixes)</span>
+        <span class="summary-value">{{ "%.2f"|format(total_fixes) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">🛒 Dépenses variables</span>
+        <span class="summary-value">{{ "%.2f"|format(total_variables) }} €</span>
+    </div>
+</div>
+{% endif %}
+
 {% if budget_max is defined and budget_max > 0 %}
 <div class="progress-section">
     <h3>Avancement du budget</h3>

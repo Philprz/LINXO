@@ -780,120 +780,26 @@ def telecharger_csv_linxo(driver, wait):
 
         print(f"[OK] URL actuelle: {driver.current_url}")
 
-        # ÉTAPE 2: Cliquer sur "Recherche avancée"
-        print("[ETAPE 2] Clic sur 'Recherche avancee'...")
-        # Essayer plusieurs sélecteurs pour gérer les changements de classes côté Linxo
-        advanced_search_locators = [
-            ("attribut data-dashname", (By.CSS_SELECTOR, "[data-dashname='AdvancedResearch']")),
-            ("texte 'Plus de détails'", (By.XPATH, "//*[contains(normalize-space(.), 'Plus de d')]")),
-            ("texte 'Recherche avancée'", (By.XPATH, "//*[contains(normalize-space(.), 'Recherche avanc')]")),
-            ("lien avec role button", (By.CSS_SELECTOR, "a[role='button']")),
-        ]
+        # ÉTAPE 2-3: Sélection de période avec auto-correction
+        print("[ETAPE 2-3] Selection de periode avec auto-correction...")
 
-        # Créer un wait plus court pour cette étape spécifique
-        # Augmenté de 5s à 10s pour améliorer la robustesse sur VPS
-        short_wait = WebDriverWait(driver, 10)
-        recherche_avancee_clicked = False
+        try:
+            from .period_selector import PeriodSelector  # pylint: disable=import-outside-toplevel
 
-        for locator_name, locator in advanced_search_locators:
-            try:
-                recherche_avancee = short_wait.until(EC.element_to_be_clickable(locator))
-                try:
-                    recherche_avancee.click()
-                except (ElementClickInterceptedException, ElementNotInteractableException):
-                    # Fallback JS click si un overlay bloque l'interaction native
-                    driver.execute_script("arguments[0].click();", recherche_avancee)
-                print(f"[OK] Clic sur 'Recherche avancee' reussi ({locator_name})")
-                time.sleep(2)
-                recherche_avancee_clicked = True
-                break
-            except (TimeoutException, NoSuchElementException) as e:
-                print(f"[WARNING] Locateur '{locator_name}' indisponible pour 'Recherche avancee'")
-            except WebDriverException as e:
-                print(f"[WARNING] Erreur WebDriver lors du clic 'Recherche avancee' ({locator_name}): {e}")
+            # Utiliser le sélecteur de période auto-adaptatif
+            period_selector = PeriodSelector(driver, wait)
+            period_selected = period_selector.select_period_with_autocorrect()
 
-        if not recherche_avancee_clicked:
-            print("[WARNING] Impossible de cliquer sur 'Recherche avancee'. Continuation avec les filtres par defaut.")
+            if period_selected:
+                print("[SUCCESS] Periode 'Ce mois-ci' selectionnee avec succes")
+            else:
+                print("[WARNING] Echec de la selection de periode via l'interface web")
+                print("[INFO] Le filtrage CSV (etape 6) sera OBLIGATOIRE pour garantir les bonnes donnees")
 
-        # ÉTAPE 3: Sélectionner "Ce mois-ci" dans le menu déroulant
-        # (uniquement si la recherche avancée a été cliquée)
-        if recherche_avancee_clicked:
-            print("[ETAPE 3] Selection de 'Ce mois-ci' dans le menu deroulant...")
-            from selenium.webdriver.support.select import Select  # pylint: disable=import-outside-toplevel
-
-            # Essayer plusieurs méthodes pour trouver le select
-            # Le premier sélecteur utilise la structure GWT spécifique trouvée par inspection
-            select_locators = [
-                ("selecteur GWT specifique", By.CSS_SELECTOR, "#gwt-container select"),
-                ("selecteur GWT detaille", By.CSS_SELECTOR, "div.GJYWTJUCBY > select"),
-                ("attribut data-dashname", By.CSS_SELECTOR, "select[data-dashname-rid*='period']"),
-                ("option contenant 'Ce mois-ci'", By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
-                ("option avec value='3'", By.XPATH, "//select[.//option[@value='3']]"),
-                ("premier select visible", By.TAG_NAME, "select"),
-            ]
-
-            select_found = False
-            select_element = None
-            for locator_name, by_method, selector in select_locators:
-                try:
-                    select_element = short_wait.until(
-                        EC.presence_of_element_located((by_method, selector))
-                    )
-                    select = Select(select_element)
-
-                    # Sélectionner "Ce mois-ci" (value="3")
-                    select.select_by_value("3")
-                    print(f"[OK] 'Ce mois-ci' selectionne ({locator_name})")
-                    select_found = True
-                    time.sleep(2)
-                    break
-                except (TimeoutException, NoSuchElementException, WebDriverException) as e:
-                    print(f"[WARNING] Methode '{locator_name}' echouee")
-
-            if not select_found:
-                print("[WARNING] Impossible de selectionner 'Ce mois-ci'")
-                print("[WARNING] Continuer avec la periode par defaut")
-
-            # ÉTAPE 3.5: Cliquer sur le bouton "Valider" pour appliquer le filtre
-            if select_found:
-                print("[ETAPE 3.5] Recherche du bouton 'Valider' pour appliquer le filtre...")
-
-                valider_locators = [
-                    ("texte 'Valider'", By.XPATH, "//button[contains(text(), 'Valider')]"),
-                    ("texte 'Appliquer'", By.XPATH, "//button[contains(text(), 'Appliquer')]"),
-                    ("texte 'Filtrer'", By.XPATH, "//button[contains(text(), 'Filtrer')]"),
-                    ("texte 'OK'", By.XPATH, "//button[contains(text(), 'OK')]"),
-                    ("input type submit", By.CSS_SELECTOR, "input[type='submit']"),
-                    ("bouton dans le meme conteneur", By.XPATH, "//select/ancestor::div[1]//button"),
-                ]
-
-                valider_clicked = False
-                for locator_name, by_method, selector in valider_locators:
-                    try:
-                        valider_button = short_wait.until(
-                            EC.element_to_be_clickable((by_method, selector))
-                        )
-                        valider_button.click()
-                        print(f"[OK] Bouton 'Valider' clique ({locator_name})")
-                        valider_clicked = True
-                        # Attendre que la page se rafraîchisse avec les données filtrées
-                        time.sleep(5)
-                        break
-                    except (TimeoutException, NoSuchElementException, WebDriverException):
-                        print(f"[WARNING] Methode '{locator_name}' echouee pour 'Valider'")
-
-                if not valider_clicked:
-                    print("[WARNING] Impossible de trouver le bouton 'Valider'")
-                    print("[WARNING] Le filtre pourrait ne pas etre applique")
-                    # Sauvegarder un screenshot pour debug
-                    try:
-                        screenshot_path = "/tmp/valider_button_not_found.png"
-                        driver.save_screenshot(screenshot_path)
-                        print(f"[DEBUG] Screenshot sauvegarde: {screenshot_path}")
-                    except Exception:
-                        pass
-        else:
-            print("[ETAPE 3] Ignoree (recherche avancee non accessible)")
+        except ImportError as e:
+            print(f"[ERROR] Impossible d'importer period_selector: {e}")
+            print("[WARNING] Utilisation de la methode de secours...")
+            print("[INFO] Le filtrage CSV (etape 6) sera OBLIGATOIRE pour garantir les bonnes donnees")
 
         # ÉTAPE 4: Cliquer sur le bouton "CSV"
         print("[ETAPE 4] Clic sur le bouton CSV...")
@@ -977,8 +883,9 @@ def telecharger_csv_linxo(driver, wait):
             print(f"[INFO] Taille: {target_csv.stat().st_size} octets")
 
             # ÉTAPE 6: TOUJOURS filtrer par mois (car la sélection web ne fonctionne pas toujours)
+            # CRITÈRE DE SUCCÈS: Le filtrage DOIT fonctionner, sinon on arrête le traitement
             print("\n" + "=" * 80)
-            print("[ETAPE 6] FILTRAGE DU CSV POUR LE MOIS COURANT")
+            print("[ETAPE 6] FILTRAGE OBLIGATOIRE DU CSV POUR LE MOIS COURANT")
             print("=" * 80)
 
             try:
@@ -988,15 +895,16 @@ def telecharger_csv_linxo(driver, wait):
                     from .csv_filter import filter_csv_by_month, get_csv_date_range  # pylint: disable=import-outside-toplevel
                     print("[DEBUG] Import du module csv_filter: OK")
                 except ImportError as import_err:
-                    print(f"[ERREUR] Impossible d'importer csv_filter: {import_err}")
+                    print(f"[ERREUR CRITIQUE] Impossible d'importer csv_filter: {import_err}")
                     import traceback  # pylint: disable=import-outside-toplevel
                     traceback.print_exc()
-                    raise
+                    print("[ERREUR] Le filtrage est OBLIGATOIRE - arret du traitement")
+                    return None
 
                 # Vérifier que le fichier CSV existe
                 if not target_csv.exists():
                     print(f"[ERREUR] Le fichier CSV n'existe pas: {target_csv}")
-                    raise FileNotFoundError(f"CSV file not found: {target_csv}")
+                    return None
 
                 print(f"[DEBUG] Fichier CSV a filtrer: {target_csv}")
                 print(f"[DEBUG] Taille du fichier: {target_csv.stat().st_size} octets")
@@ -1012,6 +920,15 @@ def telecharger_csv_linxo(driver, wait):
                 if date_range:
                     min_date, max_date = date_range
                     print(f"[INFO] Periode dans le CSV AVANT filtrage: {min_date.strftime('%d/%m/%Y')} -> {max_date.strftime('%d/%m/%Y')}")
+
+                    # Vérifier si le CSV contient déjà uniquement le mois courant
+                    from datetime import datetime  # pylint: disable=import-outside-toplevel
+                    now = datetime.now()
+                    if min_date.year == now.year and min_date.month == now.month and max_date.year == now.year and max_date.month == now.month:
+                        print(f"[SUCCESS] Le CSV contient déjà uniquement le mois courant ({now.month:02d}/{now.year})")
+                        print(f"[SUCCESS] {line_count} transactions du mois en cours")
+                        print("=" * 80 + "\n")
+                        return target_csv
                 else:
                     print("[WARNING] Impossible de determiner la plage de dates")
 
@@ -1019,46 +936,96 @@ def telecharger_csv_linxo(driver, wait):
                 print("[DEBUG] Lancement du filtrage...")
                 filtered_csv = filter_csv_by_month(target_csv)
 
-                if filtered_csv:
-                    print("[SUCCESS] CSV filtre pour le mois courant")
+                if not filtered_csv:
+                    print("[ERREUR CRITIQUE] Le filtrage a echoue (retourne None)")
+                    print("[ERREUR] Impossible de continuer sans donnees filtrees")
+                    print("[INFO] Causes possibles:")
+                    print("  1. Aucune transaction pour le mois en cours")
+                    print("  2. Erreur de format du CSV")
+                    print("  3. Colonne 'Date' introuvable")
+                    print("[ARRET] Le traitement est interrompu pour eviter d'utiliser des donnees incorrectes")
+                    return None
 
-                    # Compter le nombre de lignes après filtrage
-                    with open(target_csv, 'r', encoding='utf-8') as f:
-                        line_count_after = sum(1 for _ in f)
-                    print(f"[DEBUG] Nombre de lignes APRES filtrage: {line_count_after}")
+                # Compter le nombre de lignes après filtrage
+                with open(target_csv, 'r', encoding='utf-8') as f:
+                    line_count_after = sum(1 for _ in f)
+                print(f"[DEBUG] Nombre de lignes APRES filtrage: {line_count_after}")
 
-                    # Afficher la plage de dates APRÈS filtrage pour vérifier
-                    date_range_after = get_csv_date_range(target_csv)
-                    if date_range_after:
-                        min_date, max_date = date_range_after
-                        print(f"[INFO] Periode dans le CSV APRES filtrage: {min_date.strftime('%d/%m/%Y')} -> {max_date.strftime('%d/%m/%Y')}")
+                if line_count_after <= 1:  # Seulement l'en-tête (ou vide)
+                    print("[ERREUR CRITIQUE] Le CSV filtre ne contient aucune transaction")
+                    print("[ERREUR] Impossible de continuer sans donnees")
+                    print("[ARRET] Le traitement est interrompu")
+                    return None
 
-                    print(f"[SUCCESS] Filtrage termine! {line_count} -> {line_count_after} lignes")
+                # Afficher la plage de dates APRÈS filtrage pour vérifier
+                print("[DEBUG] Verification de la plage de dates apres filtrage...")
+                date_range_after = get_csv_date_range(target_csv)
+                if date_range_after:
+                    min_date, max_date = date_range_after
+                    print(f"[INFO] Periode dans le CSV APRES filtrage: {min_date.strftime('%d/%m/%Y')} -> {max_date.strftime('%d/%m/%Y')}")
+
+                    # VALIDATION STRICTE: Vérifier que TOUTES les dates sont bien du mois courant
+                    from datetime import datetime  # pylint: disable=import-outside-toplevel
+                    now = datetime.now()
+                    if min_date.year != now.year or min_date.month != now.month or max_date.year != now.year or max_date.month != now.month:
+                        print(f"[ERREUR CRITIQUE] Le CSV contient des dates hors du mois courant!")
+                        print(f"[ERREUR] Mois attendu: {now.month:02d}/{now.year}")
+                        print(f"[ERREUR] Plage trouvee: {min_date.strftime('%d/%m/%Y')} -> {max_date.strftime('%d/%m/%Y')}")
+                        print("[ARRET] Le traitement est interrompu pour eviter d'utiliser des donnees incorrectes")
+                        return None
+
+                    print(f"[VALIDATION OK] Toutes les transactions sont du mois courant ({now.month:02d}/{now.year})")
                 else:
-                    print("[WARNING] filter_csv_by_month a retourne None")
-                    print("[WARNING] Filtrage echoue, utilisation du CSV complet")
+                    print("[ERREUR] Impossible de valider la plage de dates apres filtrage")
+                    return None
 
-            except ImportError as e:
-                print(f"[ERREUR CRITIQUE] Impossible d'importer le module csv_filter: {e}")
-                import traceback  # pylint: disable=import-outside-toplevel
-                traceback.print_exc()
-                print("[WARNING] Le filtrage CSV ne sera pas applique")
-                print("[WARNING] Le rapport contiendra toutes les donnees historiques!")
+                print(f"[SUCCESS] Filtrage termine et valide! {line_count} -> {line_count_after} lignes")
+                print("=" * 80 + "\n")
 
-            except FileNotFoundError as e:
-                print(f"[ERREUR] Fichier CSV introuvable: {e}")
-                import traceback  # pylint: disable=import-outside-toplevel
-                traceback.print_exc()
+                # IMPORTANT: Si on a dû filtrer, c'est que la sélection web a échoué
+                # Lancer le diagnostic en arrière-plan pour corriger le problème
+                if line_count != line_count_after:
+                    print("[DIAGNOSTIC] La selection web a echoue (filtrage necessaire)")
+                    print("[DIAGNOSTIC] Lancement du diagnostic en arriere-plan...")
+
+                    try:
+                        import subprocess  # pylint: disable=import-outside-toplevel
+                        diagnostic_script = Path(__file__).parent.parent / "diagnostic_linxo_html.py"
+
+                        if diagnostic_script.exists():
+                            # Lancer en arrière-plan avec nohup (Linux) ou START /B (Windows)
+                            if platform.system() == 'Windows':
+                                subprocess.Popen(
+                                    ['python', str(diagnostic_script)],
+                                    creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.DETACHED_PROCESS,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL
+                                )
+                            else:
+                                # Linux/Unix
+                                subprocess.Popen(
+                                    ['nohup', 'python3', str(diagnostic_script), '&'],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    preexec_fn=os.setpgrp  # Détacher du groupe de processus
+                                )
+
+                            print("[DIAGNOSTIC] Diagnostic lance en arriere-plan")
+                            print(f"[DIAGNOSTIC] Script: {diagnostic_script}")
+                        else:
+                            print(f"[WARNING] Script de diagnostic introuvable: {diagnostic_script}")
+
+                    except Exception as diag_error:
+                        print(f"[WARNING] Impossible de lancer le diagnostic: {diag_error}")
+
+                return target_csv
 
             except Exception as e:
-                print(f"[ERREUR] Erreur inattendue lors du filtrage: {type(e).__name__}: {e}")
+                print(f"[ERREUR CRITIQUE] Erreur lors du filtrage: {type(e).__name__}: {e}")
                 import traceback  # pylint: disable=import-outside-toplevel
                 traceback.print_exc()
-                print("[WARNING] Utilisation du CSV complet")
-
-            print("=" * 80 + "\n")
-
-            return target_csv
+                print("[ARRET] Le traitement est interrompu - impossible de continuer sans filtrage valide")
+                return None
 
         print("[ERREUR] Aucun fichier CSV trouve dans le dossier Downloads")
         print(f"[INFO] Dossier verifie: {config.downloads_dir}")

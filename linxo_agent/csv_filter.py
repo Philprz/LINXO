@@ -46,23 +46,41 @@ def filter_csv_by_month(
         detected_encoding = None
         detected_delimiter = None
 
-        for encoding in ['utf-16', 'utf-8', 'latin-1']:
-            for delimiter in ['\t', ';', ',']:
+        # Essayer les encodages dans l'ordre le plus probable pour Linxo
+        # UTF-16 est utilisé par Linxo, donc on le teste en premier
+        encodings_to_try = ['utf-16', 'utf-16-le', 'utf-16-be', 'utf-8', 'latin-1', 'cp1252']
+        delimiters_to_try = ['\t', ';', ',']
+
+        for encoding in encodings_to_try:
+            for delimiter in delimiters_to_try:
                 try:
                     with open(input_csv, 'r', encoding=encoding) as f:
+                        # Lire la première ligne pour vérifier l'encodage
+                        first_line = f.readline()
+                        if not first_line:
+                            continue
+
+                        # Revenir au début du fichier
+                        f.seek(0)
+
                         test_reader = csv.DictReader(f, delimiter=delimiter)
-                        if date_column in test_reader.fieldnames:
+                        fieldnames = test_reader.fieldnames
+
+                        if fieldnames and date_column in fieldnames:
                             detected_encoding = encoding
                             detected_delimiter = delimiter
-                            print(f"[FILTER] Détection: encodage={encoding}, délimiteur={repr(delimiter)}")
+                            print(f"[FILTER] Detection reussie: encodage={encoding}, delimiteur={repr(delimiter)}")
                             break
-                except:
+                except Exception:
+                    # Ignorer les erreurs d'encodage et continuer
                     continue
             if detected_encoding:
                 break
 
         if not detected_encoding:
-            print(f"[ERREUR] Impossible de détecter l'encodage du CSV")
+            print(f"[ERREUR] Impossible de detecter l'encodage du CSV")
+            print(f"[DEBUG] Colonne recherchee: '{date_column}'")
+            print(f"[DEBUG] Fichier: {input_csv}")
             return None
 
         # Lire le CSV avec l'encodage détecté
@@ -148,16 +166,27 @@ def get_csv_date_range(csv_path: Path, date_column: str = "Date", date_format: s
         detected_encoding = None
         detected_delimiter = None
 
-        for encoding in ['utf-16', 'utf-8', 'latin-1']:
-            for delimiter in ['\t', ';', ',']:
+        # Essayer les encodages dans l'ordre le plus probable pour Linxo
+        encodings_to_try = ['utf-16', 'utf-16-le', 'utf-16-be', 'utf-8', 'latin-1', 'cp1252']
+        delimiters_to_try = ['\t', ';', ',']
+
+        for encoding in encodings_to_try:
+            for delimiter in delimiters_to_try:
                 try:
                     with open(csv_path, 'r', encoding=encoding) as f:
+                        first_line = f.readline()
+                        if not first_line:
+                            continue
+                        f.seek(0)
+
                         test_reader = csv.DictReader(f, delimiter=delimiter)
-                        if date_column in test_reader.fieldnames:
+                        fieldnames = test_reader.fieldnames
+
+                        if fieldnames and date_column in fieldnames:
                             detected_encoding = encoding
                             detected_delimiter = delimiter
                             break
-                except:
+                except Exception:
                     continue
             if detected_encoding:
                 break
