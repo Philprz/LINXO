@@ -320,6 +320,7 @@ class LinxoHTMLDiagnostic:
 
             advanced_search_clicked = False
             advanced_locators = [
+                ("Classe Linxo GJYWTJUCKGC", By.CSS_SELECTOR, "a.GJYWTJUCKGC, button.GJYWTJUCKGC"),
                 ("data-dashname='AdvancedResearch'", By.CSS_SELECTOR, "[data-dashname='AdvancedResearch']"),
                 ("Texte 'Plus de détails'", By.XPATH, "//*[contains(text(), 'Plus de d')]"),
                 ("Texte 'Recherche avancée'", By.XPATH, "//*[contains(text(), 'Recherche avanc')]"),

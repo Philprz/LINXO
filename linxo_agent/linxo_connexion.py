@@ -806,6 +806,7 @@ def telecharger_csv_linxo(driver, wait):
 
         # Essayer plusieurs méthodes pour trouver le bouton CSV
         csv_locators = [
+            ("bouton CSV classes Linxo", By.CSS_SELECTOR, "button.GJYWTJUCEV.GJYWTJUCNW"),
             ("attribut data-dashname CSV", By.CSS_SELECTOR, "button[data-dashname*='CSV']"),
             ("aria-label CSV", By.CSS_SELECTOR, "button[aria-label*='CSV']"),
             ("texte CSV exact", By.XPATH, "//button[normalize-space(text())='CSV']"),

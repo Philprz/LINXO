@@ -22,9 +22,172 @@ from selenium.common.exceptions import (
 class PeriodSelector:
     """Sélecteur de période auto-adaptatif pour Linxo"""
 
+    PERIOD_DROPDOWN_LOCATORS = [
+        (By.CSS_SELECTOR, "select.GJYWTJUCKY"),
+        (By.CSS_SELECTOR, "div.GJYWTJUCBY > select"),
+        (By.CSS_SELECTOR, "#gwt-container select"),
+        (By.XPATH, "//select[.//option[contains(., 'mois')]]"),
+        (By.XPATH, "//select[.//option[@value='3']]")
+    ]
+
     def __init__(self, driver, wait):
         self.driver = driver
         self.wait = wait
+
+    def _find_period_dropdown(self):
+        """Retourne le premier select affichant la période"""
+        fallback = None
+        for locator in self.PERIOD_DROPDOWN_LOCATORS:
+            try:
+                elements = self.driver.find_elements(*locator)
+            except Exception:
+                continue
+
+            for element in elements:
+                try:
+                    if element.is_displayed() and element.is_enabled():
+                        return element
+                    if fallback is None:
+                        fallback = element
+                except StaleElementReferenceException:
+                    continue
+
+        return fallback
+
+    def _wait_for_period_dropdown(self, timeout=10):
+        """Attend qu'un select de période soit disponible"""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            dropdown = self._find_period_dropdown()
+            if dropdown is not None:
+                return dropdown
+            time.sleep(0.5)
+
+        raise TimeoutException("Aucun menu déroulant de période détecté")
+
+    def _select_option_from_dropdown(self, dropdown_element, identifier):
+        """Sélectionne l'option 'Ce mois-ci' sur un select donné"""
+        if dropdown_element is None:
+            return False
+
+        try:
+            visible = dropdown_element.is_displayed()
+            enabled = dropdown_element.is_enabled()
+        except StaleElementReferenceException:
+            print(f"    [WARNING] {identifier}: element stale")
+            return False
+
+        if not visible or not enabled:
+            print(f"    [INFO] {identifier}: element non interactif (visible={visible}, enabled={enabled})")
+            return self._try_select_with_javascript(dropdown_element, identifier)
+
+        try:
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", dropdown_element)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+        try:
+            dropdown_element.click()
+        except (ElementClickInterceptedException, ElementNotInteractableException):
+            self.driver.execute_script("arguments[0].click();", dropdown_element)
+
+        try:
+            select_obj = Select(dropdown_element)
+        except Exception as e:
+            print(f"    [WARNING] {identifier}: impossible de creer Select ({e})")
+            return self._try_select_with_javascript(dropdown_element, identifier)
+
+        selection_success = False
+
+        try:
+            select_obj.select_by_value("3")
+            print(f"    [SUCCESS] {identifier}: selection via value=3")
+            selection_success = True
+        except Exception as e:
+            print(f"    [INFO] {identifier}: selection par value impossible ({e})")
+
+        if not selection_success:
+            try:
+                select_obj.select_by_visible_text("Ce mois-ci")
+                print(f"    [SUCCESS] {identifier}: selection via texte exact")
+                selection_success = True
+            except Exception as e:
+                print(f"    [INFO] {identifier}: selection par texte exact impossible ({e})")
+
+        if not selection_success:
+            try:
+                for option in select_obj.options:
+                    if "mois" in option.text.lower():
+                        option.click()
+                        print(f"    [SUCCESS] {identifier}: selection via texte partiel ({option.text})")
+                        selection_success = True
+                        break
+            except Exception as e:
+                print(f"    [INFO] {identifier}: selection par texte partiel impossible ({e})")
+
+        if selection_success:
+            time.sleep(1)
+            selected_value = None
+            selected_text = ""
+            try:
+                selected_value = dropdown_element.get_attribute("value")
+            except Exception:
+                pass
+
+            try:
+                selected_text = select_obj.first_selected_option.text.strip()
+            except Exception:
+                pass
+
+            if selected_value == "3" or "mois" in selected_text.lower():
+                print(f"    [SUCCESS] {identifier}: 'Ce mois-ci' est actif (value={selected_value}, text='{selected_text}')")
+                return True
+
+            print(f"    [WARNING] {identifier}: valeur selectionnee inattendue (value={selected_value}, text='{selected_text}')")
+
+        print(f"    [INFO] {identifier}: tentative de selection via JavaScript")
+        return self._try_select_with_javascript(dropdown_element, identifier)
+
+    def _select_with_keyboard(self, dropdown_element):
+        """Dernier recours: navigation clavier sur le select courant"""
+        if dropdown_element is None:
+            return False
+
+        print("  [Fallback] Tentative de selection par clavier...")
+        try:
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", dropdown_element)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+        try:
+            dropdown_element.click()
+        except (ElementClickInterceptedException, ElementNotInteractableException):
+            self.driver.execute_script("arguments[0].click();", dropdown_element)
+
+        try:
+            for i in range(4):
+                dropdown_element.send_keys(Keys.ARROW_DOWN)
+                time.sleep(0.3)
+                print(f"      [OK] Fleche bas {i+1}/4")
+            dropdown_element.send_keys(Keys.ENTER)
+            time.sleep(1)
+        except Exception as e:
+            print(f"    [ERROR] Impossible d'utiliser le clavier: {e}")
+            return False
+
+        try:
+            value = dropdown_element.get_attribute("value")
+        except Exception:
+            value = None
+
+        if value == "3":
+            print("    [SUCCESS] Selection clavier confirmee (value=3)")
+            return True
+
+        print(f"    [WARNING] Selection clavier non confirme (value={value})")
+        return False
 
     def _try_select_with_javascript(self, select_element, identifier):
         """
@@ -104,8 +267,17 @@ class PeriodSelector:
         """
         print("[PERIOD] Tentative de clic sur 'Recherche avancee'...")
 
+        # Si le panneau est déjà ouvert, inutile de cliquer
+        if self._find_period_dropdown():
+            print("  [INFO] Le panneau 'Recherche avancee' est deja visible")
+            return True
+
         # Méthodes à essayer dans l'ordre
         methods = [
+            {
+                'name': 'Classe Linxo GJYWTJUCKGC',
+                'locator': (By.CSS_SELECTOR, "a.GJYWTJUCKGC, button.GJYWTJUCKGC")
+            },
             {
                 'name': 'data-dashname=AdvancedResearch',
                 'locator': (By.CSS_SELECTOR, "[data-dashname='AdvancedResearch']")
@@ -131,21 +303,26 @@ class PeriodSelector:
         for method in methods:
             try:
                 print(f"  [Tentative] {method['name']}")
-
-                # Essayer de trouver et cliquer sur l'élément
                 element = self.wait.until(EC.element_to_be_clickable(method['locator']))
 
-                # Tenter un clic normal
+                try:
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                except Exception:
+                    pass
+
                 try:
                     element.click()
                 except (ElementClickInterceptedException, ElementNotInteractableException):
-                    # Fallback: clic JavaScript
-                    print(f"    [Fallback] Clic JavaScript")
+                    print("    [Fallback] Clic JavaScript")
                     self.driver.execute_script("arguments[0].click();", element)
 
-                print(f"  [SUCCESS] Clic reussi: {method['name']}")
-                time.sleep(5)  # Augmenté de 2 à 5 secondes pour laisser l'UI se charger
-                return True
+                try:
+                    self._wait_for_period_dropdown(timeout=8)
+                    print(f"  [SUCCESS] Formulaire avance affiche apres {method['name']}")
+                    return True
+                except TimeoutException:
+                    print("    [WARNING] Aucun dropdown visible apres le clic - on tente la methode suivante")
+                    continue
 
             except (TimeoutException, NoSuchElementException) as e:
                 print(f"    [WARNING] Methode echouee: {type(e).__name__}")
@@ -155,95 +332,54 @@ class PeriodSelector:
         return False
 
     def select_current_month(self):
-        """
-        Sélectionne "Ce mois-ci" dans le menu déroulant avec méthode clavier
-        Méthode simple : descendre de 4 lignes avec les flèches puis valider
-
-        Returns:
-            bool: True si succès, False sinon
-        """
+        """Sélectionne "Ce mois-ci" dans le menu déroulant de Linxo"""
         print("[PERIOD] Selection de 'Ce mois-ci'...")
 
-        # MÉTHODE 1 : Utilisation du clavier (la plus fiable)
-        print("  [Methode 1] Selection par touches clavier...")
+        dropdown_element = None
         try:
-            # Chercher le dropdown/select
-            dropdown_locators = [
-                (By.CSS_SELECTOR, "select.GJYWTJUCKY"),
-                (By.CSS_SELECTOR, "#gwt-container select"),
-                (By.CSS_SELECTOR, "div.GJYWTJUCBY > select"),
-                (By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
-            ]
+            dropdown_element = self._wait_for_period_dropdown(timeout=15)
+            print("  [INFO] Dropdown principal detecte")
+        except TimeoutException as e:
+            print(f"  [WARNING] Aucun dropdown visible apres 15s: {e}")
 
-            dropdown_element = None
-            for locator in dropdown_locators:
-                try:
-                    dropdown_element = self.driver.find_element(*locator)
-                    if dropdown_element:
-                        print(f"    [OK] Dropdown trouve avec {locator[1]}")
-                        break
-                except (NoSuchElementException, TimeoutException):
-                    continue
+        if dropdown_element and self._select_option_from_dropdown(dropdown_element, "Select principal (GJYWTJUCKY)"):
+            return True
 
-            if not dropdown_element:
-                print("    [WARNING] Aucun dropdown trouve - methode clavier echouee")
-            else:
-                # Cliquer sur le dropdown pour l'ouvrir
-                try:
-                    dropdown_element.click()
-                except:
-                    self.driver.execute_script("arguments[0].click();", dropdown_element)
+        if dropdown_element and self._select_with_keyboard(dropdown_element):
+            return True
 
-                time.sleep(1)
+        print("  [Methode 2] Recherche exhaustive des autres selects...")
 
-                # Descendre de 4 lignes avec les flèches
-                print("    [ACTION] Descente de 4 lignes avec les fleches...")
-                for i in range(4):
-                    dropdown_element.send_keys(Keys.ARROW_DOWN)
-                    time.sleep(0.3)
-                    print(f"      [OK] Ligne {i+1}/4")
-
-                # Valider avec Entrée
-                print("    [ACTION] Validation avec Entree...")
-                dropdown_element.send_keys(Keys.ENTER)
-                time.sleep(2)
-
-                print("    [SUCCESS] Selection par clavier reussie!")
-                return True
-
-        except Exception as e:
-            print(f"    [ERROR] Methode clavier echouee: {e}")
-
-        # MÉTHODE 2 : Méthodes JavaScript et Select (fallback)
-        print("  [Methode 2] Fallback sur methodes JavaScript...")
-
-        # Méthodes pour trouver le select
         select_methods = [
             {
-                'name': 'Select par ID #gwt-container',
-                'locator': (By.CSS_SELECTOR, "#gwt-container select"),
+                'name': 'Select classe Linxo (GJYWTJUCKY)',
+                'locator': (By.CSS_SELECTOR, "select.GJYWTJUCKY"),
             },
             {
                 'name': 'Select dans div.GJYWTJUCBY',
                 'locator': (By.CSS_SELECTOR, "div.GJYWTJUCBY > select"),
             },
             {
-                'name': 'Tous les selects dans la page',
-                'locator': (By.TAG_NAME, "select"),
-                'try_all': True
+                'name': 'Select #gwt-container',
+                'locator': (By.CSS_SELECTOR, "#gwt-container select"),
             },
             {
-                'name': 'Select avec option "Ce mois-ci"',
-                'locator': (By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
+                'name': 'Select contenant "mois"',
+                'locator': (By.XPATH, "//select[.//option[contains(., 'mois')]]"),
             },
             {
                 'name': 'Select avec option value=3',
-                'locator': (By.XPATH, "//select[.//option[@value='3']]"),
+                'locator': (By.XPATH, "//select[.//option[@value='3']]")
             },
             {
                 'name': 'Premier select visible',
                 'locator': (By.TAG_NAME, "select"),
                 'filter_visible': True
+            },
+            {
+                'name': 'Tous les selects (iteration)',
+                'locator': (By.TAG_NAME, "select"),
+                'try_all': True
             }
         ]
 
@@ -251,27 +387,15 @@ class PeriodSelector:
             try:
                 print(f"  [Tentative] {method['name']}")
 
-                # Trouver le select
                 if method.get('try_all'):
-                    # Essayer tous les selects de la page
                     elements = self.driver.find_elements(*method['locator'])
-                    print(f"    [INFO] {len(elements)} select(s) trouve(s) dans la page")
-
+                    print(f"    [INFO] {len(elements)} select(s) trouves")
                     for idx, elem in enumerate(elements):
-                        try:
-                            print(f"    [INFO] Tentative sur select #{idx+1}...")
-                            # Essayer de forcer la sélection via JavaScript même si non visible
-                            if self._try_select_with_javascript(elem, idx+1):
-                                return True
-                        except Exception as e:
-                            print(f"    [WARNING] Select #{idx+1} echoue: {e}")
-                            continue
-
-                    print(f"    [WARNING] Aucun select n'a fonctionne")
+                        if self._select_option_from_dropdown(elem, f"{method['name']} #{idx+1}"):
+                            return True
                     continue
 
-                elif method.get('filter_visible'):
-                    # Trouver tous les selects et filtrer les visibles
+                if method.get('filter_visible'):
                     elements = self.driver.find_elements(*method['locator'])
                     select_element = None
                     for elem in elements:
@@ -283,71 +407,14 @@ class PeriodSelector:
                             continue
 
                     if not select_element:
-                        print(f"    [WARNING] Aucun select visible trouve")
+                        print("    [WARNING] Aucun select visible trouve")
                         continue
                 else:
                     select_element = self.wait.until(
                         EC.presence_of_element_located(method['locator'])
                     )
 
-                # Essayer de rendre l'élément visible en scrollant vers lui
-                try:
-                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", select_element)
-                    time.sleep(0.5)
-                except Exception:
-                    pass
-
-                # Si l'élément n'est pas visible, essayer JavaScript directement
-                if not select_element.is_displayed():
-                    print(f"    [WARNING] Element trouve mais non visible - tentative JavaScript...")
-                    if self._try_select_with_javascript(select_element, method['name']):
-                        return True
-                    continue
-
-                # Créer l'objet Select
-                select_obj = Select(select_element)
-
-                # Afficher les options disponibles pour debug
-                print(f"    [INFO] Options disponibles:")
-                for opt in select_obj.options:
-                    marker = " [CURRENT]" if opt.is_selected() else ""
-                    print(f"      - {opt.text} (value={opt.get_attribute('value')}){marker}")
-
-                # Tenter de sélectionner "Ce mois-ci" par différentes méthodes
-                selection_success = False
-
-                # Méthode 1: Par value="3"
-                try:
-                    select_obj.select_by_value("3")
-                    print(f"    [SUCCESS] Selection par value=3")
-                    selection_success = True
-                except Exception as e:
-                    print(f"    [WARNING] Selection par value echouee: {e}")
-
-                # Méthode 2: Par texte visible
-                if not selection_success:
-                    try:
-                        select_obj.select_by_visible_text("Ce mois-ci")
-                        print(f"    [SUCCESS] Selection par texte visible")
-                        selection_success = True
-                    except Exception as e:
-                        print(f"    [WARNING] Selection par texte echouee: {e}")
-
-                # Méthode 3: Par texte partiel
-                if not selection_success:
-                    try:
-                        for option in select_obj.options:
-                            if "mois" in option.text.lower():
-                                option.click()
-                                print(f"    [SUCCESS] Selection par texte partiel: {option.text}")
-                                selection_success = True
-                                break
-                    except Exception as e:
-                        print(f"    [WARNING] Selection par texte partiel echouee: {e}")
-
-                if selection_success:
-                    print(f"  [SUCCESS] Periode selectionnee: {method['name']}")
-                    time.sleep(2)
+                if self._select_option_from_dropdown(select_element, method['name']):
                     return True
 
             except (TimeoutException, NoSuchElementException) as e:
@@ -371,6 +438,14 @@ class PeriodSelector:
 
         # Méthodes pour trouver le bouton
         button_methods = [
+            {
+                'name': 'Bouton classes Linxo (Valider)',
+                'locator': (By.CSS_SELECTOR, "button.GJYWTJUCEV.GJYWTJUCMW.GJYWTJUCHV")
+            },
+            {
+                'name': 'Bouton action data-dashlane',
+                'locator': (By.CSS_SELECTOR, "button[data-dashlane-label='true'][data-dashlane-classification='action']")
+            },
             {
                 'name': 'Bouton "Valider"',
                 'locator': (By.XPATH, "//button[contains(text(), 'Valider')]")

@@ -16,6 +16,7 @@ def test_selectors():
     # Sélecteurs pour "Recherche avancée"
     print("\n[RECHERCHE AVANCEE]")
     advanced_search_locators = [
+        ("classe Linxo GJYWTJUCKGC", (By.CSS_SELECTOR, "a.GJYWTJUCKGC, button.GJYWTJUCKGC")),
         ("attribut data-dashname", (By.CSS_SELECTOR, "[data-dashname='AdvancedResearch']")),
         ("texte 'Plus de détails'", (By.XPATH, "//*[contains(normalize-space(.), 'Plus de d')]")),
         ("texte 'Recherche avancée'", (By.XPATH, "//*[contains(normalize-space(.), 'Recherche avanc')]")),
@@ -28,6 +29,7 @@ def test_selectors():
     # Sélecteurs pour le menu déroulant
     print("\n[MENU DEROULANT 'Ce mois-ci']")
     select_locators = [
+        ("classe Linxo GJYWTJUCKY", By.CSS_SELECTOR, "select.GJYWTJUCKY"),
         ("attribut data-dashname", By.CSS_SELECTOR, "select[data-dashname-rid*='period']"),
         ("option contenant 'Ce mois-ci'", By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
         ("option avec value='3'", By.XPATH, "//select[.//option[@value='3']]"),
@@ -40,6 +42,7 @@ def test_selectors():
     # Sélecteurs pour le bouton CSV
     print("\n[BOUTON CSV]")
     csv_locators = [
+        ("bouton CSV classes Linxo", By.CSS_SELECTOR, "button.GJYWTJUCEV.GJYWTJUCNW"),
         ("attribut data-dashname CSV", By.CSS_SELECTOR, "button[data-dashname*='CSV']"),
         ("aria-label CSV", By.CSS_SELECTOR, "button[aria-label*='CSV']"),
         ("texte CSV exact", By.XPATH, "//button[normalize-space(text())='CSV']"),
