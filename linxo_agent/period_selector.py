@@ -7,6 +7,7 @@ Teste plusieurs méthodes et s'adapte automatiquement
 
 import time
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.select import Select
 from selenium.common.exceptions import (
@@ -155,12 +156,66 @@ class PeriodSelector:
 
     def select_current_month(self):
         """
-        Sélectionne "Ce mois-ci" dans le menu déroulant avec auto-détection
+        Sélectionne "Ce mois-ci" dans le menu déroulant avec méthode clavier
+        Méthode simple : descendre de 4 lignes avec les flèches puis valider
 
         Returns:
             bool: True si succès, False sinon
         """
         print("[PERIOD] Selection de 'Ce mois-ci'...")
+
+        # MÉTHODE 1 : Utilisation du clavier (la plus fiable)
+        print("  [Methode 1] Selection par touches clavier...")
+        try:
+            # Chercher le dropdown/select
+            dropdown_locators = [
+                (By.CSS_SELECTOR, "select.GJYWTJUCKY"),
+                (By.CSS_SELECTOR, "#gwt-container select"),
+                (By.CSS_SELECTOR, "div.GJYWTJUCBY > select"),
+                (By.XPATH, "//select[.//option[contains(text(), 'Ce mois-ci')]]"),
+            ]
+
+            dropdown_element = None
+            for locator in dropdown_locators:
+                try:
+                    dropdown_element = self.driver.find_element(*locator)
+                    if dropdown_element:
+                        print(f"    [OK] Dropdown trouve avec {locator[1]}")
+                        break
+                except (NoSuchElementException, TimeoutException):
+                    continue
+
+            if not dropdown_element:
+                print("    [WARNING] Aucun dropdown trouve - methode clavier echouee")
+            else:
+                # Cliquer sur le dropdown pour l'ouvrir
+                try:
+                    dropdown_element.click()
+                except:
+                    self.driver.execute_script("arguments[0].click();", dropdown_element)
+
+                time.sleep(1)
+
+                # Descendre de 4 lignes avec les flèches
+                print("    [ACTION] Descente de 4 lignes avec les fleches...")
+                for i in range(4):
+                    dropdown_element.send_keys(Keys.ARROW_DOWN)
+                    time.sleep(0.3)
+                    print(f"      [OK] Ligne {i+1}/4")
+
+                # Valider avec Entrée
+                print("    [ACTION] Validation avec Entree...")
+                dropdown_element.send_keys(Keys.ENTER)
+                time.sleep(2)
+
+                print("    [SUCCESS] Selection par clavier reussie!")
+                return True
+
+        except Exception as e:
+            print(f"    [ERROR] Methode clavier echouee: {e}")
+
+        # MÉTHODE 2 : Méthodes JavaScript et Select (fallback)
+        print("  [Methode 2] Fallback sur methodes JavaScript...")
 
         # Méthodes pour trouver le select
         select_methods = [

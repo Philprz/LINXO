@@ -912,8 +912,26 @@ def telecharger_csv_linxo(driver, wait):
                 print(f"[DEBUG] Fichier CSV a filtrer: {target_csv}")
                 print(f"[DEBUG] Taille du fichier: {target_csv.stat().st_size} octets")
 
+                # Détecter l'encodage du CSV (peut être UTF-8, UTF-16, etc.)
+                detected_encoding = None
+                encodings_to_try = ['utf-16', 'utf-16-le', 'utf-16-be', 'utf-8', 'latin-1', 'cp1252']
+
+                for encoding in encodings_to_try:
+                    try:
+                        with open(target_csv, 'r', encoding=encoding) as f:
+                            f.read(100)  # Essayer de lire les premiers octets
+                            detected_encoding = encoding
+                            print(f"[DEBUG] Encodage detecte: {encoding}")
+                            break
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+
+                if not detected_encoding:
+                    print("[ERROR] Impossible de detecter l'encodage du CSV")
+                    return None
+
                 # Compter le nombre de lignes avant filtrage
-                with open(target_csv, 'r', encoding='utf-8') as f:
+                with open(target_csv, 'r', encoding=detected_encoding) as f:
                     line_count = sum(1 for _ in f)
                 print(f"[DEBUG] Nombre de lignes AVANT filtrage: {line_count}")
 
