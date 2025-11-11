@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .log-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #4a5568;
+    }
+
+    .form-select, .form-input {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+
+    .form-select:focus, .form-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .filter-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .filter-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .filter-badge.active {
+        border-color: #667eea;
+        font-weight: 600;
+    }
+
+    .filter-badge.all { background: #e5e7eb; color: #374151; }
+    .filter-badge.all.active { background: #667eea; color: white; }
+    .filter-badge.success { background: #d4edda; color: #155724; }
+    .filter-badge.success.active { border-color: #28a745; }
+    .filter-badge.error { background: #f8d7da; color: #721c24; }
+    .filter-badge.error.active { border-color: #dc3545; }
+    .filter-badge.warning { background: #fff3cd; color: #856404; }
+    .filter-badge.warning.active { border-color: #ffc107; }
+    .filter-badge.info { background: #d1ecf1; color: #0c5460; }
+    .filter-badge.info.active { border-color: #17a2b8; }
+
+    .log-viewer {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 1.5rem;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        max-height: 600px;
+        overflow-y: auto;
+        position: relative;
+    }
+
+    .log-line {
+        padding: 0.3rem 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    .log-line:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-line-number {
+        display: inline-block;
+        width: 60px;
+        color: #858585;
+        user-select: none;
+        margin-right: 1rem;
+    }
+
+    .log-success { color: #4ade80; }
+    .log-error { color: #f87171; }
+    .log-warning { color: #fbbf24; }
+    .log-info { color: #60a5fa; }
+
+    .pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1.5rem;
+    }
+
+    .pagination-info {
+        color: #6c757d;
+    }
+
+    .pagination-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .no-logs {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+    .live-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background: #28a745;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+        margin-right: 0.5rem;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">📜 Visualiseur de Logs</h1>
+    </div>
+
+    <!-- Sélection du fichier -->
+    <div class="log-controls">
+        <div class="form-group">
+            <label class="form-label">Fichier de log</label>
+            <select class="form-select" id="log-file-select" onchange="loadLogFile()">
+                <option value="">Chargement...</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Recherche</label>
+            <input type="text" class="form-input" id="search-input" placeholder="Rechercher dans les logs..."
+                   onkeyup="handleSearchKeyup(event)">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary" onclick="refreshLogs()">🔄 Rafraîchir</button>
+        </div>
+    </div>
+
+    <!-- Filtres par niveau -->
+    <div class="filter-badges">
+        <span class="filter-badge all active" onclick="setLevelFilter('')" id="filter-all">
+            Tous
+        </span>
+        <span class="filter-badge success" onclick="setLevelFilter('SUCCESS')" id="filter-success">
+            ✅ Succès
+        </span>
+        <span class="filter-badge error" onclick="setLevelFilter('ERROR')" id="filter-error">
+            ❌ Erreurs
+        </span>
+        <span class="filter-badge warning" onclick="setLevelFilter('WARNING')" id="filter-warning">
+            ⚠️ Warnings
+        </span>
+        <span class="filter-badge info" onclick="setLevelFilter('INFO')" id="filter-info">
+            ℹ️ Infos
+        </span>
+    </div>
+
+    <!-- Affichage des logs -->
+    <div id="logs-container">
+        <div class="loading" style="text-align: center; padding: 2rem;">
+            Chargement des logs...
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination" style="display: none;">
+        <div class="pagination-info" id="pagination-info"></div>
+        <div class="pagination-buttons">
+            <button class="btn btn-secondary" onclick="loadPreviousPage()" id="btn-prev" disabled>
+                ← Précédent
+            </button>
+            <button class="btn btn-secondary" onclick="loadNextPage()" id="btn-next" disabled>
+                Suivant →
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentFile = null;
+    let currentOffset = 0;
+    let currentLimit = 100;
+    let currentLevel = '';
+    let currentSearch = '';
+    let totalLines = 0;
+
+    // Charger la liste des fichiers au démarrage
+    async function loadLogFiles() {
+        try {
+            const response = await fetch('/admin/api/logs/files');
+            const data = await response.json();
+
+            const select = document.getElementById('log-file-select');
+            select.innerHTML = '';
+
+            if (data.files.length === 0) {
+                select.innerHTML = '<option value="">Aucun fichier de log</option>';
+                return;
+            }
+
+            data.files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.name;
+                option.textContent = `${file.name} (${file.size_mb} MB)`;
+                if (file.is_cron && !currentFile) {
+                    option.selected = true;
+                    currentFile = file.name;
+                }
+                select.appendChild(option);
+            });
+
+            // Charger le premier fichier
+            if (currentFile) {
+                loadLogContent();
+            }
+
+        } catch (error) {
+            console.error('Erreur chargement fichiers:', error);
+        }
+    }
+
+    async function loadLogFile() {
+        const select = document.getElementById('log-file-select');
+        currentFile = select.value;
+        currentOffset = 0;
+        loadLogContent();
+    }
+
+    async function loadLogContent() {
+        if (!currentFile) return;
+
+        const container = document.getElementById('logs-container');
+        container.innerHTML = '<div class="loading" style="text-align: center; padding: 2rem;">Chargement...</div>';
+
+        try {
+            const params = new URLSearchParams({
+                file_name: currentFile,
+                offset: currentOffset,
+                limit: currentLimit
+            });
+
+            if (currentLevel) params.append('level', currentLevel);
+            if (currentSearch) params.append('search', currentSearch);
+
+            const response = await fetch(`/admin/api/logs/content?${params}`);
+            const data = await response.json();
+
+            totalLines = data.total;
+
+            if (data.lines.length === 0) {
+                container.innerHTML = '<div class="no-logs">Aucun log trouvé avec ces filtres</div>';
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+
+            // Afficher les logs
+            const logViewer = document.createElement('div');
+            logViewer.className = 'log-viewer';
+
+            data.lines.forEach(entry => {
+                const line = document.createElement('div');
+                line.className = `log-line log-${entry.level.toLowerCase()}`;
+
+                const lineNum = document.createElement('span');
+                lineNum.className = 'log-line-number';
+                lineNum.textContent = entry.line_number;
+
+                line.appendChild(lineNum);
+                line.appendChild(document.createTextNode(entry.line));
+
+                logViewer.appendChild(line);
+            });
+
+            container.innerHTML = '';
+            container.appendChild(logViewer);
+
+            // Mettre à jour la pagination
+            updatePagination(data);
+
+        } catch (error) {
+            console.error('Erreur chargement logs:', error);
+            container.innerHTML = '<div class="alert alert-error">Erreur lors du chargement des logs</div>';
+        }
+    }
+
+    function updatePagination(data) {
+        const pagination = document.getElementById('pagination');
+        const paginationInfo = document.getElementById('pagination-info');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+
+        pagination.style.display = 'flex';
+
+        const start = currentOffset + 1;
+        const end = Math.min(currentOffset + data.lines.length, totalLines);
+        paginationInfo.textContent = `Affichage de ${start} à ${end} sur ${totalLines} lignes`;
+
+        btnPrev.disabled = currentOffset === 0;
+        btnNext.disabled = !data.has_more;
+    }
+
+    function loadPreviousPage() {
+        currentOffset = Math.max(0, currentOffset - currentLimit);
+        loadLogContent();
+    }
+
+    function loadNextPage() {
+        currentOffset += currentLimit;
+        loadLogContent();
+    }
+
+    function setLevelFilter(level) {
+        currentLevel = level;
+        currentOffset = 0;
+
+        // Mettre à jour l'affichage des badges
+        document.querySelectorAll('.filter-badge').forEach(badge => {
+            badge.classList.remove('active');
+        });
+
+        if (level === '') {
+            document.getElementById('filter-all').classList.add('active');
+        } else {
+            document.getElementById(`filter-${level.toLowerCase()}`).classList.add('active');
+        }
+
+        loadLogContent();
+    }
+
+    function handleSearchKeyup(event) {
+        if (event.key === 'Enter') {
+            currentSearch = document.getElementById('search-input').value;
+            currentOffset = 0;
+            loadLogContent();
+        }
+    }
+
+    function refreshLogs() {
+        loadLogContent();
+        showNotification('Logs rafraîchis', 'success');
+    }
+
+    // Charger au démarrage
+    loadLogFiles();
+</script>
+{% endblock %}

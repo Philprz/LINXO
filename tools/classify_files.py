@@ -111,8 +111,7 @@ class FileClassifier:
             return
 
         # Essential documentation
-        essential_docs = {'README.md', '00_COMMENCER_ICI.md', 'START_HERE.md',
-                         'LANCEMENT_RAPIDE.md', 'GUIDE_DEPLOIEMENT_VPS.md'}
+        essential_docs = {'README.md', 'START_HERE.md', 'LANCEMENT_RAPIDE.md'}
         if file_name in essential_docs:
             self.keep_files.append((rel_str, "Essential documentation"))
             return

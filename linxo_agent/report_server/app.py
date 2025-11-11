@@ -25,6 +25,19 @@ from dotenv import load_dotenv
 # Charger les variables d'environnement
 load_dotenv()
 
+# Import du routeur admin
+try:
+    from .admin import router as admin_router
+    ADMIN_ENABLED = True
+except ImportError:
+    try:
+        # Essayer import absolu si l'import relatif échoue
+        from linxo_agent.report_server.admin import router as admin_router
+        ADMIN_ENABLED = True
+    except ImportError:
+        ADMIN_ENABLED = False
+        print("[WARN] Module admin non disponible")
+
 # Configuration
 REPORTS_BASE_DIR = Path(__file__).parent.parent.parent / 'data' / 'reports'
 STATIC_DIR = Path(__file__).parent.parent.parent / 'static'
@@ -44,6 +57,11 @@ app = FastAPI(
     description="Serveur sécurisé pour les rapports Linxo",
     version="1.0.0"
 )
+
+# Inclure le routeur admin si disponible
+if ADMIN_ENABLED:
+    app.include_router(admin_router)
+    print("[OK] Interface d'administration activee sur /admin")
 
 # Security
 security = HTTPBasic()
@@ -288,23 +306,25 @@ if __name__ == "__main__":
     port = int(os.getenv('REPORTS_PORT', 8810))
 
     print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║                 LINXO REPORT SERVER                          ║
-╚══════════════════════════════════════════════════════════════╝
+===============================================================
+                 LINXO REPORT SERVER
+===============================================================
 
-Serveur démarré sur http://0.0.0.0:{port}
+Serveur demarre sur http://0.0.0.0:{port}
 
 Configuration:
   - Basic Auth User: {REPORTS_BASIC_USER}
-  - Token signing: {'Activé' if REPORTS_SIGNING_KEY else 'Désactivé'}
+  - Token signing: {'Active' if REPORTS_SIGNING_KEY else 'Desactive'}
   - Reports directory: {REPORTS_BASE_DIR}
+  - Admin interface: {'Active' if ADMIN_ENABLED else 'Desactive'}
 
 Endpoints:
-  - GET /healthz          : Health check (non authentifié)
+  - GET /healthz          : Health check (non authentifie)
   - GET /                 : Page d'accueil
-  - GET /reports/...      : Rapports HTML (authentifié)
+  - GET /reports/...      : Rapports HTML (authentifie)
+  - GET /admin            : Interface admin (authentifie)
 
-Appuyez sur Ctrl+C pour arrêter le serveur
+Appuyez sur Ctrl+C pour arreter le serveur
     """)
 
     uvicorn.run(

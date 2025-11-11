@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .config-section {
+        margin-bottom: 2rem;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #4a5568;
+    }
+
+    .form-input, .form-textarea {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+
+    .form-input:focus, .form-textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .expense-item {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .expense-info {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .expense-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-small {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+    }
+
+    .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .tag {
+        background: #e5e7eb;
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .tag-remove {
+        cursor: pointer;
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-close {
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Configuration du Budget -->
+<div class="card config-section">
+    <div class="card-header">
+        <h2 class="card-title">💰 Budget</h2>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Budget variable mensuel (€)</label>
+            <input type="number" class="form-input" id="budget-input" placeholder="1700">
+        </div>
+        <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary" onclick="updateBudget()">💾 Sauvegarder</button>
+        </div>
+    </div>
+</div>
+
+<!-- Destinataires des Notifications -->
+<div class="card config-section">
+    <div class="card-header">
+        <h2 class="card-title">📧 Destinataires des Notifications</h2>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label class="form-label">Emails</label>
+        <div id="email-tags" class="tag-list"></div>
+        <input type="email" class="form-input" id="email-input" placeholder="Ajouter un email"
+               onkeypress="handleEmailKeypress(event)">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label class="form-label">Téléphones SMS</label>
+        <div id="sms-tags" class="tag-list"></div>
+        <input type="tel" class="form-input" id="sms-input" placeholder="Ajouter un numéro (+33...)"
+               onkeypress="handleSmsKeypress(event)">
+    </div>
+
+    <button class="btn btn-primary" onclick="updateRecipients()">💾 Sauvegarder les destinataires</button>
+</div>
+
+<!-- Dépenses Récurrentes -->
+<div class="card config-section">
+    <div class="card-header">
+        <h2 class="card-title">📊 Dépenses Récurrentes</h2>
+        <button class="btn btn-success" onclick="showAddExpenseModal()">+ Ajouter</button>
+    </div>
+
+    <div id="expenses-list">
+        <div class="loading" style="text-align: center; padding: 2rem;">Chargement...</div>
+    </div>
+</div>
+
+<!-- Modal d'ajout/édition de dépense -->
+<div id="expense-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-title">Ajouter une dépense</h3>
+            <span class="modal-close" onclick="closeExpenseModal()">×</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Libellé</label>
+            <input type="text" class="form-input" id="modal-libelle" placeholder="Ex: EDF">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Montant (€)</label>
+                <input type="number" step="0.01" class="form-input" id="modal-montant" placeholder="150.00">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tolérance (%)</label>
+                <input type="number" step="0.01" class="form-input" id="modal-tolerance" placeholder="5" value="5">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Catégorie</label>
+                <input type="text" class="form-input" id="modal-categorie" placeholder="Ex: Logement">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Identifiant</label>
+                <input type="text" class="form-input" id="modal-identifiant" placeholder="Ex: Électricité">
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label class="form-label">Commentaire (optionnel)</label>
+            <textarea class="form-textarea" id="modal-commentaire" rows="2"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-primary" onclick="saveExpense()" style="flex: 1;">💾 Sauvegarder</button>
+            <button class="btn btn-secondary" onclick="closeExpenseModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let emailList = [];
+    let smsList = [];
+    let currentExpenseId = null;
+
+    // Charger la configuration au démarrage
+    async function loadConfig() {
+        await loadBudget();
+        await loadRecipients();
+        await loadExpenses();
+    }
+
+    async function loadBudget() {
+        try {
+            const response = await fetch('/admin/api/config/budget');
+            const data = await response.json();
+            document.getElementById('budget-input').value = data.budget_variable_int;
+        } catch (error) {
+            console.error('Erreur chargement budget:', error);
+        }
+    }
+
+    async function loadRecipients() {
+        try {
+            const response = await fetch('/admin/api/config/recipients');
+            const data = await response.json();
+
+            emailList = data.email || [];
+            smsList = data.sms || [];
+
+            renderEmailTags();
+            renderSmsTags();
+        } catch (error) {
+            console.error('Erreur chargement destinataires:', error);
+        }
+    }
+
+    async function loadExpenses() {
+        try {
+            const response = await fetch('/admin/api/config/expenses');
+            const data = await response.json();
+
+            renderExpenses(data.depenses_fixes || []);
+        } catch (error) {
+            console.error('Erreur chargement dépenses:', error);
+        }
+    }
+
+    function renderEmailTags() {
+        const container = document.getElementById('email-tags');
+        container.innerHTML = emailList.map(email => `
+            <span class="tag">
+                ${email}
+                <span class="tag-remove" onclick="removeEmail('${email}')">×</span>
+            </span>
+        `).join('');
+    }
+
+    function renderSmsTags() {
+        const container = document.getElementById('sms-tags');
+        container.innerHTML = smsList.map(sms => `
+            <span class="tag">
+                ${sms}
+                <span class="tag-remove" onclick="removeSms('${sms}')">×</span>
+            </span>
+        `).join('');
+    }
+
+    function handleEmailKeypress(event) {
+        if (event.key === 'Enter') {
+            const input = document.getElementById('email-input');
+            const email = input.value.trim();
+            if (email && !emailList.includes(email)) {
+                emailList.push(email);
+                renderEmailTags();
+                input.value = '';
+            }
+        }
+    }
+
+    function handleSmsKeypress(event) {
+        if (event.key === 'Enter') {
+            const input = document.getElementById('sms-input');
+            const sms = input.value.trim();
+            if (sms && !smsList.includes(sms)) {
+                smsList.push(sms);
+                renderSmsTags();
+                input.value = '';
+            }
+        }
+    }
+
+    function removeEmail(email) {
+        emailList = emailList.filter(e => e !== email);
+        renderEmailTags();
+    }
+
+    function removeSms(sms) {
+        smsList = smsList.filter(s => s !== sms);
+        renderSmsTags();
+    }
+
+    async function updateBudget() {
+        const budget = parseInt(document.getElementById('budget-input').value);
+
+        if (isNaN(budget) || budget <= 0) {
+            showNotification('Budget invalide', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/admin/api/config/budget', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({budget_variable: budget})
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showNotification('Budget mis à jour avec succès', 'success');
+            } else {
+                showNotification('Échec mise à jour du budget', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function updateRecipients() {
+        try {
+            const response = await fetch('/admin/api/config/recipients', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: emailList, sms: smsList})
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showNotification('Destinataires mis à jour avec succès', 'success');
+            } else {
+                showNotification('Échec mise à jour des destinataires', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    function renderExpenses(expenses) {
+        const container = document.getElementById('expenses-list');
+
+        if (expenses.length === 0) {
+            container.innerHTML = '<div class="no-logs">Aucune dépense récurrente configurée</div>';
+            return;
+        }
+
+        container.innerHTML = expenses.map(expense => `
+            <div class="expense-item">
+                <div class="expense-info">
+                    <div>
+                        <strong>${expense.identifiant || expense.libelle}</strong>
+                        <div style="font-size: 0.85rem; color: #6c757d;">${expense.libelle}</div>
+                    </div>
+                    <div>${expense.montant}€</div>
+                    <div>${expense.categorie}</div>
+                    <div>±${((expense.montant_tolerance || 0.05) * 100).toFixed(0)}%</div>
+                </div>
+                <div class="expense-actions">
+                    <button class="btn btn-primary btn-small" onclick="editExpense(${expense.id})">✏️</button>
+                    <button class="btn btn-danger btn-small" onclick="deleteExpense(${expense.id})">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function showAddExpenseModal() {
+        currentExpenseId = null;
+        document.getElementById('modal-title').textContent = 'Ajouter une dépense';
+        document.getElementById('modal-libelle').value = '';
+        document.getElementById('modal-montant').value = '';
+        document.getElementById('modal-tolerance').value = '5';
+        document.getElementById('modal-categorie').value = '';
+        document.getElementById('modal-identifiant').value = '';
+        document.getElementById('modal-commentaire').value = '';
+        document.getElementById('expense-modal').classList.add('show');
+    }
+
+    async function editExpense(id) {
+        try {
+            const response = await fetch('/admin/api/config/expenses');
+            const data = await response.json();
+            const expense = data.depenses_fixes.find(e => e.id === id);
+
+            if (!expense) return;
+
+            currentExpenseId = id;
+            document.getElementById('modal-title').textContent = 'Modifier la dépense';
+            document.getElementById('modal-libelle').value = expense.libelle;
+            document.getElementById('modal-montant').value = expense.montant;
+            document.getElementById('modal-tolerance').value = (expense.montant_tolerance || 0.05) * 100;
+            document.getElementById('modal-categorie').value = expense.categorie || '';
+            document.getElementById('modal-identifiant').value = expense.identifiant || '';
+            document.getElementById('modal-commentaire').value = expense.commentaire || '';
+            document.getElementById('expense-modal').classList.add('show');
+        } catch (error) {
+            showNotification('Erreur chargement dépense', 'error');
+        }
+    }
+
+    async function saveExpense() {
+        const expense = {
+            libelle: document.getElementById('modal-libelle').value,
+            montant: parseFloat(document.getElementById('modal-montant').value),
+            montant_tolerance: parseFloat(document.getElementById('modal-tolerance').value) / 100,
+            categorie: document.getElementById('modal-categorie').value,
+            identifiant: document.getElementById('modal-identifiant').value,
+            commentaire: document.getElementById('modal-commentaire').value
+        };
+
+        if (!expense.libelle || !expense.montant || !expense.categorie || !expense.identifiant) {
+            showNotification('Tous les champs obligatoires doivent être remplis', 'error');
+            return;
+        }
+
+        try {
+            const url = currentExpenseId
+                ? `/admin/api/config/expenses/${currentExpenseId}`
+                : '/admin/api/config/expenses';
+
+            const method = currentExpenseId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(expense)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showNotification(result.message, 'success');
+                closeExpenseModal();
+                await loadExpenses();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function deleteExpense(id) {
+        if (!confirm('Voulez-vous vraiment supprimer cette dépense ?')) return;
+
+        try {
+            const response = await fetch(`/admin/api/config/expenses/${id}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showNotification(result.message, 'success');
+                await loadExpenses();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    function closeExpenseModal() {
+        document.getElementById('expense-modal').classList.remove('show');
+    }
+
+    // Charger au démarrage
+    loadConfig();
+</script>
+{% endblock %}

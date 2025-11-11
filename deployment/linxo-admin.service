@@ -1,0 +1,48 @@
+# Service systemd pour l'interface d'administration Linxo
+# Fichier : /etc/systemd/system/linxo-admin.service
+
+[Unit]
+Description=Linxo Admin Interface - FastAPI Server
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=linxo
+Group=linxo
+WorkingDirectory=/home/linxo/LINXO
+Environment="PATH=/home/linxo/LINXO/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/home/linxo/LINXO"
+
+# Commande de démarrage
+ExecStart=/home/linxo/LINXO/.venv/bin/python -m uvicorn linxo_agent.report_server.app:app \
+    --host 0.0.0.0 \
+    --port 8810 \
+    --workers 2 \
+    --log-level info \
+    --access-log \
+    --use-colors
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=0
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/linxo/LINXO/logs /home/linxo/LINXO/data
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=512M
+CPUQuota=50%
+
+# Standard output/error
+StandardOutput=append:/home/linxo/LINXO/logs/admin-server.log
+StandardError=append:/home/linxo/LINXO/logs/admin-server-error.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+
+    .status-success { background: #28a745; }
+    .status-error { background: #dc3545; }
+    .status-warning { background: #ffc107; }
+    .status-unknown { background: #6c757d; }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .action-buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .action-btn {
+        padding: 1rem;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .action-btn:hover:not(:disabled) {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    }
+
+    .action-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 24px;
+        background: #e9ecef;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .progress-fill.warning {
+        background: linear-gradient(90deg, #ff9800 0%, #f57c00 100%);
+    }
+
+    .progress-fill.danger {
+        background: linear-gradient(90deg, #f44336 0%, #d32f2f 100%);
+    }
+
+    .chrome-process {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .refresh-indicator {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-align: right;
+        margin-top: 1rem;
+    }
+
+    .log-preview {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .log-line {
+        padding: 0.2rem 0;
+        white-space: pre-wrap;
+    }
+
+    .log-success { color: #4ade80; }
+    .log-error { color: #f87171; }
+    .log-warning { color: #fbbf24; }
+    .log-info { color: #60a5fa; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">Dashboard - Vue d'ensemble</h1>
+        <span class="refresh-indicator" id="refresh-indicator">
+            Rafraîchissement automatique dans <span id="countdown">30</span>s
+        </span>
+    </div>
+
+    <!-- Statut du dernier Cron -->
+    <div class="grid grid-3">
+        <div class="stat-box">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-label">Dernier Cron</div>
+            <div class="stat-value" id="cron-status-badge">
+                {% if status.cron.status == 'success' %}
+                <span class="status-indicator status-success"></span>
+                {% elif status.cron.status == 'error' %}
+                <span class="status-indicator status-error"></span>
+                {% elif status.cron.status == 'warning' %}
+                <span class="status-indicator status-warning"></span>
+                {% else %}
+                <span class="status-indicator status-unknown"></span>
+                {% endif %}
+            </div>
+            <div class="stat-label" id="cron-message">{{ status.cron.message }}</div>
+            {% if status.cron.timestamp %}
+            <div class="stat-label" style="font-size: 0.75rem; margin-top: 0.5rem;">
+                <script>document.write(formatDate('{{ status.cron.timestamp }}'))</script>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-icon">🖥️</div>
+            <div class="stat-label">Processus Chrome</div>
+            <div class="stat-value" id="chrome-count">{{ status.chrome.process_count }}</div>
+            <div class="stat-label">processus actifs</div>
+            {% if status.chrome.process_count > 0 %}
+            <button class="btn btn-danger" style="margin-top: 1rem;" onclick="cleanupChrome()">
+                Nettoyer
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-icon">💾</div>
+            <div class="stat-label">Espace Disque</div>
+            <div class="stat-value" id="disk-free">{{ status.disk.free_gb }} GB</div>
+            <div class="stat-label">disponible</div>
+            <div class="progress-bar">
+                <div class="progress-fill {% if status.disk.percent > 90 %}danger{% elif status.disk.percent > 75 %}warning{% endif %}"
+                     style="width: {{ status.disk.percent }}%"
+                     id="disk-progress">
+                    {{ status.disk.percent }}%
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions Rapides -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">⚡ Actions Rapides</h2>
+    </div>
+
+    <div class="action-buttons">
+        <button class="action-btn btn-success" onclick="executeAction('execute')" id="btn-execute">
+            ▶️ Exécuter maintenant
+        </button>
+        <button class="action-btn btn-primary" onclick="executeAction('download-csv')" id="btn-download-csv">
+            📥 Télécharger CSV
+        </button>
+        <button class="action-btn btn-primary" onclick="executeAction('analyze')" id="btn-analyze">
+            📊 Analyser dernier CSV
+        </button>
+        <button class="action-btn btn-secondary" onclick="executeAction('diagnostic')" id="btn-diagnostic">
+            🔧 Lancer diagnostic
+        </button>
+        <button class="action-btn btn-primary" onclick="executeAction('test-email')" id="btn-test-email">
+            📧 Test Email
+        </button>
+        <button class="action-btn btn-primary" onclick="executeAction('test-sms')" id="btn-test-sms">
+            📱 Test SMS
+        </button>
+    </div>
+
+    <div id="action-result" style="margin-top: 1.5rem;"></div>
+    <div id="task-output" style="margin-top: 1.5rem;"></div>
+</div>
+
+<!-- Informations Système -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">💻 Système</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 0.75rem; font-weight: 600;">Plateforme</td>
+                <td style="padding: 0.75rem;">{{ status.system.platform }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 0.75rem; font-weight: 600;">Hostname</td>
+                <td style="padding: 0.75rem;">{{ status.system.hostname }}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 0.75rem; font-weight: 600;">Python</td>
+                <td style="padding: 0.75rem;">{{ status.system.python_version }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 0.75rem; font-weight: 600;">Logs size</td>
+                <td style="padding: 0.75rem;" id="logs-size">{{ status.directories.logs_size_mb }} MB</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📁 Répertoires</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 0.75rem; font-weight: 600;">Data</td>
+                <td style="padding: 0.75rem;">
+                    {% if status.directories.data_exists %}
+                    <span class="badge badge-success">✓ OK</span>
+                    {% else %}
+                    <span class="badge badge-error">✗ Absent</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 0.75rem; font-weight: 600;">Logs</td>
+                <td style="padding: 0.75rem;">
+                    {% if status.directories.logs_exists %}
+                    <span class="badge badge-success">✓ OK</span>
+                    {% else %}
+                    <span class="badge badge-error">✗ Absent</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 0.75rem; font-weight: 600;">Reports</td>
+                <td style="padding: 0.75rem;">
+                    {% if status.directories.reports_exists %}
+                    <span class="badge badge-success">✓ OK</span>
+                    {% else %}
+                    <span class="badge badge-error">✗ Absent</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+{% if status.chrome.processes %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">🔍 Processus Chrome Détectés</h3>
+    </div>
+    <div id="chrome-processes">
+        {% for proc in status.chrome.processes %}
+        <div class="chrome-process">
+            <div>
+                <strong>PID {{ proc.pid }}</strong> - {{ proc.name }}
+            </div>
+            <div>
+                CPU: {{ proc.cpu }}% | RAM: {{ "%.1f"|format(proc.memory_mb) }} MB
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let refreshCountdown = 30;
+    let countdownInterval;
+
+    // Auto-refresh du statut toutes les 30 secondes
+    function startAutoRefresh() {
+        countdownInterval = setInterval(() => {
+            refreshCountdown--;
+            document.getElementById('countdown').textContent = refreshCountdown;
+
+            if (refreshCountdown <= 0) {
+                refreshStatus();
+                refreshCountdown = 30;
+            }
+        }, 1000);
+    }
+
+    async function refreshStatus() {
+        try {
+            const response = await fetch('/admin/api/status');
+            const status = await response.json();
+
+            // Mettre à jour les indicateurs
+            updateDashboard(status);
+        } catch (error) {
+            console.error('Erreur refresh:', error);
+        }
+    }
+
+    function updateDashboard(status) {
+        // Mettre à jour le statut cron
+        const cronBadge = document.getElementById('cron-status-badge');
+        let statusClass = 'status-unknown';
+        if (status.cron.status === 'success') statusClass = 'status-success';
+        else if (status.cron.status === 'error') statusClass = 'status-error';
+        else if (status.cron.status === 'warning') statusClass = 'status-warning';
+
+        cronBadge.innerHTML = `<span class="status-indicator ${statusClass}"></span>`;
+        document.getElementById('cron-message').textContent = status.cron.message;
+
+        // Mettre à jour Chrome
+        document.getElementById('chrome-count').textContent = status.chrome.process_count;
+
+        // Mettre à jour disque
+        document.getElementById('disk-free').textContent = status.disk.free_gb + ' GB';
+        const diskProgress = document.getElementById('disk-progress');
+        diskProgress.style.width = status.disk.percent + '%';
+        diskProgress.textContent = status.disk.percent + '%';
+        diskProgress.className = 'progress-fill';
+        if (status.disk.percent > 90) diskProgress.classList.add('danger');
+        else if (status.disk.percent > 75) diskProgress.classList.add('warning');
+
+        // Mettre à jour logs size
+        document.getElementById('logs-size').textContent = status.directories.logs_size_mb + ' MB';
+    }
+
+    async function cleanupChrome() {
+        if (!confirm('Voulez-vous vraiment tuer tous les processus Chrome ?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/admin/api/cleanup-chrome', {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                showNotification(`${result.killed_count} processus Chrome tués`, 'success');
+                setTimeout(refreshStatus, 1000);
+            } else {
+                showNotification('Erreur lors du nettoyage', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    let currentTaskId = null;
+    let taskCheckInterval = null;
+
+    async function executeAction(action) {
+        const resultDiv = document.getElementById('action-result');
+        const outputDiv = document.getElementById('task-output');
+
+        // Désactiver tous les boutons
+        document.querySelectorAll('.action-btn').forEach(b => b.disabled = true);
+
+        resultDiv.innerHTML = `<div class="alert alert-info">⏳ Lancement de l'action "${action}"...</div>`;
+        outputDiv.innerHTML = '';
+
+        try {
+            // Lancer l'action
+            const response = await fetch(`/admin/api/${action}`, {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                currentTaskId = result.task_id;
+                resultDiv.innerHTML = `<div class="alert alert-success">✅ ${result.message}</div>`;
+
+                // Créer la zone d'affichage de l'output
+                outputDiv.innerHTML = `
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📋 Sortie de la tâche</h3>
+                            <span class="badge badge-info" id="task-status">En cours...</span>
+                        </div>
+                        <div class="log-preview" id="task-log" style="min-height: 200px;">
+                            <div class="log-line">Démarrage de la tâche...</div>
+                        </div>
+                    </div>
+                `;
+
+                // Commencer à suivre le statut
+                startTaskMonitoring(currentTaskId);
+
+            } else {
+                resultDiv.innerHTML = `<div class="alert alert-error">❌ Erreur: ${result.error || 'Échec de l\'action'}</div>`;
+                document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+            }
+
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="alert alert-error">❌ Erreur: ${error.message}</div>`;
+            document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+        }
+    }
+
+    async function startTaskMonitoring(taskId) {
+        // Arrêter l'ancien monitoring s'il existe
+        if (taskCheckInterval) {
+            clearInterval(taskCheckInterval);
+        }
+
+        // Vérifier le statut toutes les 2 secondes
+        taskCheckInterval = setInterval(async () => {
+            await checkTaskStatus(taskId);
+        }, 2000);
+
+        // Première vérification immédiate
+        await checkTaskStatus(taskId);
+    }
+
+    async function checkTaskStatus(taskId) {
+        try {
+            const response = await fetch(`/admin/api/task/${taskId}`);
+            const task = await response.json();
+
+            // Mettre à jour le badge de statut
+            const statusBadge = document.getElementById('task-status');
+            const logDiv = document.getElementById('task-log');
+
+            if (!statusBadge || !logDiv) return;
+
+            // Mettre à jour le statut
+            let badgeClass = 'badge-info';
+            let statusText = 'En cours...';
+
+            if (task.status === 'success') {
+                badgeClass = 'badge-success';
+                statusText = '✅ Terminé avec succès';
+            } else if (task.status === 'error') {
+                badgeClass = 'badge-error';
+                statusText = '❌ Erreur';
+            } else if (task.status === 'running') {
+                badgeClass = 'badge-info';
+                statusText = '⏳ En cours...';
+            }
+
+            statusBadge.className = `badge ${badgeClass}`;
+            statusBadge.textContent = statusText;
+
+            // Mettre à jour les logs
+            if (task.output && task.output.length > 0) {
+                logDiv.innerHTML = task.output.map(line => {
+                    let cssClass = 'log-line';
+                    if (line.includes('[SUCCESS]') || line.includes('succès') || line.includes('réussi')) {
+                        cssClass += ' log-success';
+                    } else if (line.includes('[ERROR]') || line.includes('Erreur') || line.includes('échec')) {
+                        cssClass += ' log-error';
+                    } else if (line.includes('[WARNING]') || line.includes('Attention')) {
+                        cssClass += ' log-warning';
+                    } else if (line.includes('[INFO]')) {
+                        cssClass += ' log-info';
+                    }
+                    return `<div class="${cssClass}">${escapeHtml(line)}</div>`;
+                }).join('');
+
+                // Scroll vers le bas
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
+            // Si la tâche est terminée, arrêter le monitoring
+            if (task.status === 'success' || task.status === 'error') {
+                clearInterval(taskCheckInterval);
+                taskCheckInterval = null;
+
+                // Réactiver les boutons
+                document.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+
+                // Afficher la durée
+                if (task.duration_seconds) {
+                    const durationText = `Durée: ${task.duration_seconds.toFixed(1)}s`;
+                    const durationDiv = document.createElement('div');
+                    durationDiv.className = 'log-line log-info';
+                    durationDiv.textContent = durationText;
+                    logDiv.appendChild(durationDiv);
+                }
+
+                // Rafraîchir le dashboard
+                setTimeout(refreshStatus, 1000);
+            }
+
+        } catch (error) {
+            console.error('Erreur lors de la vérification du statut:', error);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Démarrer l'auto-refresh au chargement
+    startAutoRefresh();
+</script>
+{% endblock %}

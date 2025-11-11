@@ -171,7 +171,7 @@ CONTENU :
 
 POUR PLUS DE DÉTAILS :
 ----------------------
-Consultez le fichier GUIDE_DEPLOIEMENT_VPS.md
+Consultez le fichier README.md (section Déploiement VPS)
 
 =============================================================================
 EOF
@@ -233,7 +233,7 @@ echo "   ${YELLOW}cd ${DEPLOY_NAME}${NC}"
 echo "   ${YELLOW}cat DEPLOYMENT_README.txt${NC}"
 echo ""
 echo "4. Suivre le guide complet :"
-echo "   ${YELLOW}less GUIDE_DEPLOIEMENT_VPS.md${NC}"
+echo "   ${YELLOW}less README.md${NC}"
 echo ""
 echo "==========================================================================="
 echo ""

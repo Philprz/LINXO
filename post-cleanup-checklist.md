@@ -327,7 +327,6 @@ ls deploy/cleanup.sh
 
 # Docs
 ls README.md
-ls GUIDE_DEPLOIEMENT_VPS.md
 ```
 
 **Result:**

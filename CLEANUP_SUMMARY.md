@@ -12,7 +12,7 @@
 - ✅ `test_analyzer.py` - Script de correction Pylint pour RELIABLE (obsolète)
 
 ### 2. Documentation obsolète
-- ✅ `README.md` → Sauvegardé en `README_OLD.md` puis remplacé par nouvelle version
+- ✅ `README.md` → Ancienne version archivée puis retirée (nouvelle version en place)
 
 ---
 
@@ -257,7 +257,7 @@ cp -r LINXO_BACKUP_20251028 LINXO
 
 ### Documentation
 - [x] Créer nouveau `README.md`
-- [x] Sauvegarder ancien README en `README_OLD.md`
+- [x] Sauvegarder ancien README (archive interne, fichier public supprimé)
 - [x] Créer `MIGRATION_VPS_HTML.md`
 - [x] Créer `CLEANUP_SUMMARY.md`
 
