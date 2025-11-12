@@ -627,6 +627,74 @@
         }
     }
 
+    function parseDateSafe(value) {
+        if (!value) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            const [year, month, day] = value.split('-').map(Number);
+            return new Date(year, month - 1, day);
+        }
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+            const [day, month, year] = value.split('/').map(Number);
+            return new Date(year, month - 1, day);
+        }
+        const auto = new Date(value);
+        return Number.isNaN(auto.getTime()) ? null : auto;
+    }
+
+    function normalizeMonths(expense) {
+        if (Array.isArray(expense.mois_occurrence) && expense.mois_occurrence.length) {
+            return expense.mois_occurrence
+                .map(Number)
+                .filter(month => month >= 1 && month <= 12)
+                .sort((a, b) => a - b);
+        }
+
+        const periodicite = String(expense.periodicite || 'mensuel').toLowerCase();
+        return periodicitePresets[periodicite] || periodicitePresets.mensuel;
+    }
+
+    function isAdjustmentActive(adjustment, referenceDate) {
+        const start = parseDateSafe(adjustment.date_debut) || new Date(0);
+        const end = parseDateSafe(adjustment.date_fin) || new Date(8640000000000000);
+        return start <= referenceDate && referenceDate <= end;
+    }
+
+    function computeBudgetPreviewFromClient(financeData) {
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+
+        const revenusTotal = (financeData.revenus || []).reduce((total, revenu) => {
+            const montant = parseFloat(revenu.montant);
+            return total + (Number.isNaN(montant) ? 0 : montant);
+        }, 0);
+
+        const depensesMois = (financeData.depenses_fixes || []).reduce((total, expense) => {
+            const months = normalizeMonths(expense);
+            if (!months.includes(currentMonth)) {
+                return total;
+            }
+            const montant = parseFloat(expense.montant);
+            return total + (Number.isNaN(montant) ? 0 : montant);
+        }, 0);
+
+        const ajustementsActifs = (financeData.ajustements_budget || []).reduce((total, adjustment) => {
+            if (!isAdjustmentActive(adjustment, now)) {
+                return total;
+            }
+            const montant = parseFloat(adjustment.montant);
+            return total + (Number.isNaN(montant) ? 0 : montant);
+        }, 0);
+
+        const budgetEstime = revenusTotal - depensesMois + ajustementsActifs;
+
+        return {
+            revenus_total: Number(revenusTotal.toFixed(2)),
+            depenses_fixes_mois: Number(depensesMois.toFixed(2)),
+            ajustements_actifs: Number(ajustementsActifs.toFixed(2)),
+            budget_estime: Number(budgetEstime.toFixed(2)),
+        };
+    }
+
     async function loadFinance() {
         try {
             const response = await fetch('/admin/api/config/expenses');
@@ -636,7 +704,8 @@
             renderExpenses(data.depenses_fixes || []);
             renderRevenues(data.revenus || []);
             renderAdjustments(data.ajustements_budget || []);
-            updateBudgetSummary(data.budget_preview || {});
+            const summary = data.budget_preview || computeBudgetPreviewFromClient(data);
+            updateBudgetSummary(summary);
         } catch (error) {
             console.error('Erreur chargement finances:', error);
             document.getElementById('expenses-list').innerHTML = '<div class="finance-empty">Impossible de charger les finances</div>';
