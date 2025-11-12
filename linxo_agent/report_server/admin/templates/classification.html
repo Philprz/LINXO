@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table th,
+    .table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        font-size: 0.9rem;
+    }
+
+    .table th {
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .badge {
+        display: inline-flex;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .badge-success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .badge-warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .history-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.85rem;
+    }
+
+    .history-item:last-child {
+        border-bottom: none;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .modal-close {
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: #6c757d;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        font-size: 0.85rem;
+        margin-bottom: 0.3rem;
+        color: #4a5568;
+        font-weight: 600;
+    }
+
+    .form-input,
+    .form-textarea {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    .form-textarea {
+        resize: vertical;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card config-section">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">🤖 Transactions à valider</h2>
+            <p style="font-size: 0.85rem; color: #6c757d;">
+                Confirmez les classifications proposées ou corrigez-les pour entraîner le modèle.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="limit-select" class="form-input" style="width: auto;">
+                <option value="50">50 dernières</option>
+                <option value="100" selected>100 dernières</option>
+                <option value="200">200 dernières</option>
+            </select>
+            <button class="btn btn-secondary" onclick="loadTransactions()">🔄 Actualiser</button>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Catégorie</th>
+                    <th>Montant</th>
+                    <th>Confidence</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="transactions-body">
+                <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #6c757d;">
+        Dernière mise à jour : <span id="transactions-updated">--</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">📝 Historique des corrections</h2>
+            <p style="font-size: 0.85rem; color: #6c757d;">Suivi des validations et corrections envoyées au modèle.</p>
+        </div>
+    </div>
+    <div id="history-list"></div>
+</div>
+
+<div id="correction-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Corriger la catégorie</h3>
+            <span class="modal-close" onclick="closeCorrectionModal()">×</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Libellé</label>
+            <input type="text" class="form-input" id="correction-libelle" readonly>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Catégorie actuelle</label>
+                <input type="text" class="form-input" id="correction-categorie-actuelle" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nouvelle catégorie</label>
+                <input type="text" class="form-input" id="correction-categorie-nouvelle" placeholder="Ex: Alimentation">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Commentaire</label>
+            <textarea class="form-textarea" id="correction-commentaire" rows="2"
+                      placeholder="Expliquez pourquoi la catégorie change"></textarea>
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-primary" style="flex:1;" onclick="submitCorrection()">💾 Envoyer</button>
+            <button class="btn btn-secondary" onclick="closeCorrectionModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let transactionsCache = [];
+    let currentTransactionId = null;
+
+    const currencyFormatter = new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumFractionDigits: 2
+    });
+
+    function formatCurrency(value) {
+        return currencyFormatter.format(value || 0);
+    }
+
+    function formatDateFr(dateStr) {
+        if (!dateStr) return '--/--';
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
+        }
+        const d = new Date(dateStr);
+        return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('fr-FR');
+    }
+
+    async function loadTransactions() {
+        const limit = document.getElementById('limit-select').value;
+        try {
+            const response = await fetch(`/admin/api/classification/transactions?limit=${limit}`);
+            const data = await response.json();
+            if (!data.success) {
+                showNotification(data.error || 'Impossible de charger les transactions', 'error');
+                return;
+            }
+
+            transactionsCache = data.transactions || [];
+            renderTransactions(transactionsCache);
+            document.getElementById('transactions-updated').textContent = new Date(data.generated_at || Date.now()).toLocaleString('fr-FR');
+        } catch (error) {
+            showNotification('Erreur lors du chargement des transactions', 'error');
+        }
+    }
+
+    function renderTransactions(transactions) {
+        const body = document.getElementById('transactions-body');
+        if (!transactions.length) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune transaction à valider</td></tr>';
+            return;
+        }
+
+        body.innerHTML = transactions.map(tx => `
+            <tr>
+                <td>${tx.date || '--/--'}<br><small>${tx.compte || ''}</small></td>
+                <td>
+                    <strong>${tx.libelle}</strong><br>
+                    <small>${tx.notes || ''}</small>
+                </td>
+                <td>
+                    ${tx.categorie || 'Non classé'}
+                    ${tx.depense_recurrente ? '<span class="badge badge-success">Fixe</span>' : ''}
+                </td>
+                <td>${formatCurrency(tx.montant)}</td>
+                <td>
+                    ${tx.ml_confidence ? (tx.ml_confidence * 100).toFixed(0) + '%' : '—'}
+                </td>
+                <td class="actions-cell">
+                    <button class="btn btn-success btn-small" onclick="markTransactionCorrect('${tx.id}')">✅ Correct</button>
+                    <button class="btn btn-primary btn-small" onclick="openCorrectionModal('${tx.id}')">✏️ Corriger</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function markTransactionCorrect(id) {
+        const tx = transactionsCache.find(t => t.id === id);
+        if (!tx) return;
+
+        try {
+            const response = await fetch('/admin/api/classification/feedback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    transaction_id: tx.id,
+                    libelle: tx.libelle,
+                    categorie_initiale: tx.categorie,
+                    statut: 'correct',
+                    montant: tx.montant,
+                    compte: tx.compte,
+                    date_transaction: tx.date,
+                    ml_confidence: tx.ml_confidence
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                showNotification('Merci pour la validation 👍', 'success');
+                await loadTransactions();
+                await loadHistory();
+            } else {
+                showNotification(result.error || 'Impossible d\'enregistrer la validation', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    function openCorrectionModal(id) {
+        const tx = transactionsCache.find(t => t.id === id);
+        if (!tx) return;
+        currentTransactionId = id;
+        document.getElementById('correction-libelle').value = tx.libelle || '';
+        document.getElementById('correction-categorie-actuelle').value = tx.categorie || '';
+        document.getElementById('correction-categorie-nouvelle').value = '';
+        document.getElementById('correction-commentaire').value = '';
+        document.getElementById('correction-modal').classList.add('show');
+    }
+
+    function closeCorrectionModal() {
+        document.getElementById('correction-modal').classList.remove('show');
+    }
+
+    async function submitCorrection() {
+        const tx = transactionsCache.find(t => t.id === currentTransactionId);
+        if (!tx) return;
+
+        const nouvelleCategorie = document.getElementById('correction-categorie-nouvelle').value.trim();
+        const commentaire = document.getElementById('correction-commentaire').value.trim();
+
+        if (!nouvelleCategorie) {
+            showNotification('Merci de proposer une nouvelle catégorie', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/admin/api/classification/feedback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    transaction_id: tx.id,
+                    libelle: tx.libelle,
+                    categorie_initiale: tx.categorie,
+                    categorie_corrigee: nouvelleCategorie,
+                    commentaire,
+                    statut: 'corrige',
+                    montant: tx.montant,
+                    compte: tx.compte,
+                    date_transaction: tx.date,
+                    ml_confidence: tx.ml_confidence
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                showNotification('Correction enregistrée 👌', 'success');
+                closeCorrectionModal();
+                await loadTransactions();
+                await loadHistory();
+            } else {
+                showNotification(result.error || 'Erreur lors de l\'enregistrement', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function loadHistory() {
+        try {
+            const response = await fetch('/admin/api/classification/feedback?limit=30');
+            const data = await response.json();
+            if (!data.success) return;
+
+            const container = document.getElementById('history-list');
+            if (!data.history.length) {
+                container.innerHTML = '<div class="history-item">Aucune correction enregistrée pour le moment.</div>';
+                return;
+            }
+
+            container.innerHTML = data.history.map(item => `
+                <div class="history-item">
+                    <div>
+                        <strong>${item.libelle}</strong><br>
+                        <small>${item.categorie_initiale || 'Non classé'} → ${item.categorie_corrigee}</small>
+                    </div>
+                    <div style="text-align:right;">
+                        <div>${formatCurrency(item.montant)}</div>
+                        <small>${new Date(item.created_at).toLocaleString('fr-FR')}</small>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Erreur historique corrections:', error);
+        }
+    }
+
+    loadTransactions();
+    loadHistory();
+</script>
+{% endblock %}

@@ -314,7 +314,7 @@ def lire_csv_linxo(csv_path):
         return [], []
 
 
-def analyser_transactions(transactions, use_ml=True):
+def analyser_transactions(transactions, use_ml=True, enable_learning=True, enable_familles=True):
     """
     Analyse les transactions et les classe
 
@@ -327,6 +327,8 @@ def analyser_transactions(transactions, use_ml=True):
     """
     config = get_config()
     depenses_fixes_ref = config.depenses_data.get('depenses_fixes', [])
+    depenses_recurrentes = depenses_fixes_ref
+    all_transactions = transactions
 
     depenses_fixes = []
     depenses_variables = []
@@ -390,51 +392,53 @@ def analyser_transactions(transactions, use_ml=True):
         print(f"[ML] {ml_classifications} transactions améliorées par IA")
 
     # Lancer la détection automatique de patterns (Phase 2)
-    try:
-        from pattern_learner import RecurringPatternLearner
-        learner = RecurringPatternLearner(config)
+    if enable_learning:
+        try:
+            from pattern_learner import RecurringPatternLearner
+            learner = RecurringPatternLearner(config)
 
-        # Détecter nouvelles dépenses récurrentes
-        new_recurring = learner.detect_new_recurring(all_transactions, months_to_analyze=6, min_occurrences=3)
+            # Détecter nouvelles dépenses récurrentes
+            new_recurring = learner.detect_new_recurring(all_transactions, months_to_analyze=6, min_occurrences=3)
 
-        # Détecter variantes de libellés
-        libelle_variants = learner.detect_libelle_variants(depenses_recurrentes, all_transactions, months_to_analyze=6)
+            # Détecter variantes de libellés
+            libelle_variants = learner.detect_libelle_variants(depenses_recurrentes, all_transactions, months_to_analyze=6)
 
-        # Sauvegarder les suggestions (sera affiché dans le rapport)
-        if new_recurring or libelle_variants:
-            for suggestion in new_recurring:
-                learner.add_suggestion(suggestion)
-            for suggestion in libelle_variants:
-                learner.add_suggestion(suggestion)
+            # Sauvegarder les suggestions (sera affiché dans le rapport)
+            if new_recurring or libelle_variants:
+                for suggestion in new_recurring:
+                    learner.add_suggestion(suggestion)
+                for suggestion in libelle_variants:
+                    learner.add_suggestion(suggestion)
 
-            print(f"[PATTERN LEARNER] {len(new_recurring)} nouvelles depenses recurrentes detectees")
-            print(f"[PATTERN LEARNER] {len(libelle_variants)} variantes de libelles detectees")
-    except Exception as e:
-        print(f"[WARN] Erreur pattern learner: {e}")
+                print(f"[PATTERN LEARNER] {len(new_recurring)} nouvelles depenses recurrentes detectees")
+                print(f"[PATTERN LEARNER] {len(libelle_variants)} variantes de libelles detectees")
+        except Exception as e:
+            print(f"[WARN] Erreur pattern learner: {e}")
 
     # Agréger les dépenses par famille (Phase 3)
     familles_aggregees = {}
     famille_alerts = []
-    try:
-        from family_aggregator import ExpenseFamilyAggregator
-        aggregator = ExpenseFamilyAggregator(config)
+    if enable_familles:
+        try:
+            from family_aggregator import ExpenseFamilyAggregator
+            aggregator = ExpenseFamilyAggregator(config)
 
-        # Agréger les transactions par famille
-        familles_aggregees = aggregator.aggregate_by_family(depenses_fixes)
+            # Agréger les transactions par famille
+            familles_aggregees = aggregator.aggregate_by_family(depenses_fixes)
 
-        # Obtenir les alertes
-        famille_alerts = aggregator.get_alerts(familles_aggregees)
+            # Obtenir les alertes
+            famille_alerts = aggregator.get_alerts(familles_aggregees)
 
-        # Afficher le résumé
-        if familles_aggregees:
-            print("\n" + aggregator.get_family_summary(familles_aggregees))
+            # Afficher le résumé
+            if familles_aggregees:
+                print("\n" + aggregator.get_family_summary(familles_aggregees))
 
-        if famille_alerts:
-            print("\n[ALERTES FAMILLES]")
-            for alert in famille_alerts:
-                print(f"  - {alert['message']}")
-    except Exception as e:
-        print(f"[WARN] Erreur family aggregator: {e}")
+            if famille_alerts:
+                print("\n[ALERTES FAMILLES]")
+                for alert in famille_alerts:
+                    print(f"  - {alert['message']}")
+        except Exception as e:
+            print(f"[WARN] Erreur family aggregator: {e}")
 
     return {
         'depenses_fixes': depenses_fixes,

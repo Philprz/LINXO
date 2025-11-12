@@ -8,7 +8,7 @@
 
     .form-row {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 1rem;
         margin-bottom: 1rem;
     }
@@ -25,44 +25,189 @@
         color: #4a5568;
     }
 
-    .form-input, .form-textarea {
+    .form-input,
+    .form-textarea,
+    .form-select {
         padding: 0.5rem 0.75rem;
         border: 1px solid #d1d5db;
         border-radius: 6px;
         font-size: 0.875rem;
     }
 
-    .form-input:focus, .form-textarea:focus {
+    .form-input:focus,
+    .form-textarea:focus,
+    .form-select:focus {
         outline: none;
         border-color: #667eea;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
 
-    .expense-item {
+    .helper-text {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: -0.5rem;
+    }
+
+    .finance-item {
         background: #f8f9fa;
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 10px;
         margin-bottom: 0.75rem;
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: 2fr 1fr 1fr auto;
         gap: 1rem;
         align-items: center;
     }
 
-    .expense-info {
-        display: grid;
-        grid-template-columns: 2fr 1fr 1fr 1fr;
-        gap: 1rem;
+    .finance-info h4 {
+        margin-bottom: 0.2rem;
+        font-size: 1rem;
     }
 
-    .expense-actions {
+    .finance-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+        line-height: 1.3;
+    }
+
+    .finance-actions {
         display: flex;
         gap: 0.5rem;
+        justify-content: flex-end;
     }
 
     .btn-small {
         padding: 0.4rem 0.8rem;
         font-size: 0.85rem;
+    }
+
+    .occurrence-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.4rem;
+    }
+
+    .occurrence-chip {
+        background: #e2e8f0;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+    }
+
+    .finance-empty {
+        text-align: center;
+        color: #6c757d;
+        padding: 1.5rem;
+        font-style: italic;
+    }
+
+    .month-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+        gap: 0.4rem;
+    }
+
+    .month-chip {
+        border: 1px solid #cbd5f5;
+        border-radius: 6px;
+        padding: 0.35rem 0.2rem;
+        text-align: center;
+        font-size: 0.85rem;
+        cursor: pointer;
+        background: white;
+        transition: all 0.15s ease;
+    }
+
+    .month-chip.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    .month-chip:hover {
+        border-color: #764ba2;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 720px;
+        width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-close {
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: #6c757d;
+    }
+
+    .budget-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .summary-card {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 1rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .summary-label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: #8892b0;
+        letter-spacing: 0.05em;
+    }
+
+    .summary-value {
+        font-size: 1.35rem;
+        font-weight: 600;
+        margin-top: 0.3rem;
+        color: #2d3748;
+    }
+
+    .adjustments-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .adjustments-table th,
+    .adjustments-table td {
+        padding: 0.65rem;
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.9rem;
     }
 
     .tag-list {
@@ -87,46 +232,6 @@
         color: #dc3545;
         font-weight: bold;
     }
-
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .modal.show {
-        display: flex;
-    }
-
-    .modal-content {
-        background: white;
-        padding: 2rem;
-        border-radius: 12px;
-        max-width: 600px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
-
-    .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-
-    .modal-close {
-        cursor: pointer;
-        font-size: 1.5rem;
-        color: #6c757d;
-    }
 </style>
 {% endblock %}
 
@@ -145,6 +250,44 @@
         <div class="form-group">
             <label class="form-label">&nbsp;</label>
             <button class="btn btn-primary" onclick="updateBudget()">💾 Sauvegarder</button>
+        </div>
+    </div>
+
+    <div class="budget-summary" id="budget-summary">
+        <div class="summary-card">
+            <div class="summary-label">Revenus (mois courant)</div>
+            <div class="summary-value" id="summary-revenus">-- €</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">Dépenses fixes prévues</div>
+            <div class="summary-value" id="summary-depenses">-- €</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">Ajustements actifs</div>
+            <div class="summary-value" id="summary-ajustements">-- €</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">Budget estimé</div>
+            <div class="summary-value" id="summary-budget">-- €</div>
+        </div>
+    </div>
+</div>
+
+<!-- URL des rapports -->
+<div class="card config-section">
+    <div class="card-header">
+        <h2 class="card-title">🔗 Liens publics</h2>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">URL publique des rapports HTML</label>
+            <input type="url" class="form-input" id="reports-url-input" placeholder="https://linxo.appliprz.ovh/reports">
+            <p class="helper-text">C'est l'adresse utilisée dans l'email pour ouvrir les rapports (ex: https://linxo.appliprz.ovh/reports).</p>
+        </div>
+        <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary" onclick="updateReportsUrl()">💾 Sauvegarder</button>
         </div>
     </div>
 </div>
@@ -172,16 +315,33 @@
     <button class="btn btn-primary" onclick="updateRecipients()">💾 Sauvegarder les destinataires</button>
 </div>
 
+<!-- Revenus -->
+<div class="card config-section">
+    <div class="card-header">
+        <h2 class="card-title">💼 Revenus</h2>
+        <button class="btn btn-success" onclick="showAddIncomeModal()">+ Ajouter un revenu</button>
+    </div>
+    <div id="revenues-list"></div>
+</div>
+
 <!-- Dépenses Récurrentes -->
 <div class="card config-section">
     <div class="card-header">
         <h2 class="card-title">📊 Dépenses Récurrentes</h2>
-        <button class="btn btn-success" onclick="showAddExpenseModal()">+ Ajouter</button>
+        <button class="btn btn-success" onclick="showAddExpenseModal()">+ Ajouter une dépense</button>
     </div>
-
     <div id="expenses-list">
-        <div class="loading" style="text-align: center; padding: 2rem;">Chargement...</div>
+        <div class="finance-empty">Chargement...</div>
     </div>
+</div>
+
+<!-- Ajustements -->
+<div class="card config-section">
+    <div class="card-header">
+        <h2 class="card-title">⚖️ Ajustements budgétaires</h2>
+        <button class="btn btn-success" onclick="showAddAdjustmentModal()">+ Ajouter un ajustement</button>
+    </div>
+    <div id="adjustments-table"></div>
 </div>
 
 <!-- Modal d'ajout/édition de dépense -->
@@ -192,9 +352,26 @@
             <span class="modal-close" onclick="closeExpenseModal()">×</span>
         </div>
 
-        <div class="form-group" style="margin-bottom: 1rem;">
-            <label class="form-label">Libellé</label>
-            <input type="text" class="form-input" id="modal-libelle" placeholder="Ex: EDF">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Libellé</label>
+                <input type="text" class="form-input" id="modal-libelle" placeholder="Ex: EDF">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Identifiant</label>
+                <input type="text" class="form-input" id="modal-identifiant" placeholder="Nom court">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Compte</label>
+                <input type="text" class="form-input" id="modal-compte" placeholder="Ex: LCL">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Catégorie</label>
+                <input type="text" class="form-input" id="modal-categorie" placeholder="Ex: Logement">
+            </div>
         </div>
 
         <div class="form-row">
@@ -210,16 +387,28 @@
 
         <div class="form-row">
             <div class="form-group">
-                <label class="form-label">Catégorie</label>
-                <input type="text" class="form-input" id="modal-categorie" placeholder="Ex: Logement">
+                <label class="form-label">Périodicité</label>
+                <select class="form-select" id="modal-periodicite" onchange="handlePeriodiciteChange()">
+                    <option value="mensuel">Mensuel</option>
+                    <option value="bimestriel">Bimestriel</option>
+                    <option value="trimestriel">Trimestriel</option>
+                    <option value="semestriel">Semestriel</option>
+                    <option value="annuel">Annuel</option>
+                    <option value="personnalise">Personnalisé</option>
+                </select>
             </div>
             <div class="form-group">
-                <label class="form-label">Identifiant</label>
-                <input type="text" class="form-input" id="modal-identifiant" placeholder="Ex: Électricité">
+                <label class="form-label">Jour de prélèvement</label>
+                <input type="number" class="form-input" min="1" max="31" id="modal-jour" value="5">
             </div>
         </div>
 
-        <div class="form-group" style="margin-bottom: 1.5rem;">
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Mois d'exécution</label>
+            <div class="month-selector" id="month-selector"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
             <label class="form-label">Commentaire (optionnel)</label>
             <textarea class="form-textarea" id="modal-commentaire" rows="2"></textarea>
         </div>
@@ -231,19 +420,176 @@
     </div>
 </div>
 
+<!-- Modal revenus -->
+<div id="income-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="income-modal-title">Ajouter un revenu</h3>
+            <span class="modal-close" onclick="closeIncomeModal()">×</span>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Libellé</label>
+                <input type="text" class="form-input" id="income-libelle">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Identifiant</label>
+                <input type="text" class="form-input" id="income-identifiant">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Compte</label>
+                <input type="text" class="form-input" id="income-compte">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Catégorie</label>
+                <input type="text" class="form-input" id="income-categorie" placeholder="Revenus">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Montant (€)</label>
+            <input type="number" step="0.01" class="form-input" id="income-montant">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Commentaire</label>
+            <textarea class="form-textarea" id="income-commentaire" rows="2"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-primary" onclick="saveIncome()" style="flex: 1;">💾 Sauvegarder</button>
+            <button class="btn btn-secondary" onclick="closeIncomeModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal ajustements -->
+<div id="adjustment-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="adjustment-modal-title">Ajouter un ajustement</h3>
+            <span class="modal-close" onclick="closeAdjustmentModal()">×</span>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Libellé</label>
+                <input type="text" class="form-input" id="adjustment-nom" placeholder="Ex: Prime exceptionnelle">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Montant (€)</label>
+                <input type="number" class="form-input" id="adjustment-montant" placeholder="+500 / -200">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Date de début</label>
+                <input type="date" class="form-input" id="adjustment-debut">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Date de fin</label>
+                <input type="date" class="form-input" id="adjustment-fin">
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Commentaire</label>
+            <textarea class="form-textarea" id="adjustment-commentaire" rows="2"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-primary" onclick="saveAdjustment()" style="flex: 1;">💾 Sauvegarder</button>
+            <button class="btn btn-secondary" onclick="closeAdjustmentModal()">Annuler</button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
     let emailList = [];
     let smsList = [];
+    let financeCache = {depenses_fixes: [], revenus: [], ajustements_budget: []};
     let currentExpenseId = null;
+    let currentIncomeId = null;
+    let currentAdjustmentId = null;
+    let selectedMonths = Array.from({length: 12}, (_, i) => i + 1);
 
-    // Charger la configuration au démarrage
+    const monthLabels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+    const periodicitePresets = {
+        mensuel: Array.from({length: 12}, (_, i) => i + 1),
+        bimestriel: [1, 3, 5, 7, 9, 11],
+        trimestriel: [1, 4, 7, 10],
+        semestriel: [1, 7],
+        annuel: [1]
+    };
+
+    const currencyFormatter = new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumFractionDigits: 2
+    });
+
+    function formatCurrency(value) {
+        return currencyFormatter.format(value || 0);
+    }
+
+    function formatDateFr(isoDate) {
+        if (!isoDate) return '--/--';
+        const d = new Date(isoDate);
+        if (Number.isNaN(d.getTime())) return isoDate;
+        return d.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
+    }
+
+    function guessPeriodicite(months) {
+        const key = Object.entries(periodicitePresets)
+            .find(([_, preset]) => preset.length === months.length && preset.every((value, idx) => value === months[idx]));
+        return key ? key[0] : 'personnalise';
+    }
+
+    function renderMonthSelector() {
+        const container = document.getElementById('month-selector');
+        container.innerHTML = monthLabels.map((label, index) => {
+            const monthNumber = index + 1;
+            const active = selectedMonths.includes(monthNumber) ? 'active' : '';
+            return `<button type="button" class="month-chip ${active}" onclick="toggleMonth(${monthNumber})">${label}</button>`;
+        }).join('');
+    }
+
+    function toggleMonth(month) {
+        if (selectedMonths.includes(month)) {
+            selectedMonths = selectedMonths.filter(m => m !== month);
+        } else {
+            selectedMonths = [...selectedMonths, month].sort((a, b) => a - b);
+        }
+        renderMonthSelector();
+        document.getElementById('modal-periodicite').value = guessPeriodicite(selectedMonths);
+    }
+
+    function setSelectedMonths(months) {
+        selectedMonths = (months && months.length) ? months : Array.from({length: 12}, (_, i) => i + 1);
+        renderMonthSelector();
+        document.getElementById('modal-periodicite').value = guessPeriodicite(selectedMonths);
+    }
+
+    function handlePeriodiciteChange() {
+        const value = document.getElementById('modal-periodicite').value;
+        if (value !== 'personnalise') {
+            setSelectedMonths(periodicitePresets[value] || Array.from({length: 12}, (_, i) => i + 1));
+        }
+    }
+
     async function loadConfig() {
         await loadBudget();
         await loadRecipients();
-        await loadExpenses();
+        await loadFinance();
+        await loadReportsUrl();
     }
 
     async function loadBudget() {
@@ -253,6 +599,16 @@
             document.getElementById('budget-input').value = data.budget_variable_int;
         } catch (error) {
             console.error('Erreur chargement budget:', error);
+        }
+    }
+
+    async function loadReportsUrl() {
+        try {
+            const response = await fetch('/admin/api/config/reports-url');
+            const data = await response.json();
+            document.getElementById('reports-url-input').value = data.reports_base_url || 'https://linxo.appliprz.ovh/reports';
+        } catch (error) {
+            console.error('Erreur chargement URL rapports:', error);
         }
     }
 
@@ -271,15 +627,27 @@
         }
     }
 
-    async function loadExpenses() {
+    async function loadFinance() {
         try {
             const response = await fetch('/admin/api/config/expenses');
             const data = await response.json();
+            financeCache = data;
 
             renderExpenses(data.depenses_fixes || []);
+            renderRevenues(data.revenus || []);
+            renderAdjustments(data.ajustements_budget || []);
+            updateBudgetSummary(data.budget_preview || {});
         } catch (error) {
-            console.error('Erreur chargement dépenses:', error);
+            console.error('Erreur chargement finances:', error);
+            document.getElementById('expenses-list').innerHTML = '<div class="finance-empty">Impossible de charger les finances</div>';
         }
+    }
+
+    function updateBudgetSummary(summary) {
+        document.getElementById('summary-revenus').textContent = formatCurrency(summary.revenus_total || 0);
+        document.getElementById('summary-depenses').textContent = formatCurrency(summary.depenses_fixes_mois || 0);
+        document.getElementById('summary-ajustements').textContent = formatCurrency(summary.ajustements_actifs || 0);
+        document.getElementById('summary-budget').textContent = formatCurrency(summary.budget_estime || 0);
     }
 
     function renderEmailTags() {
@@ -337,9 +705,9 @@
     }
 
     async function updateBudget() {
-        const budget = parseInt(document.getElementById('budget-input').value);
+        const budget = parseInt(document.getElementById('budget-input').value, 10);
 
-        if (isNaN(budget) || budget <= 0) {
+        if (Number.isNaN(budget) || budget <= 0) {
             showNotification('Budget invalide', 'error');
             return;
         }
@@ -352,7 +720,6 @@
             });
 
             const result = await response.json();
-
             if (result.success) {
                 showNotification('Budget mis à jour avec succès', 'success');
             } else {
@@ -372,9 +739,8 @@
             });
 
             const result = await response.json();
-
             if (result.success) {
-                showNotification('Destinataires mis à jour avec succès', 'success');
+                showNotification('Destinataires mis à jour', 'success');
             } else {
                 showNotification('Échec mise à jour des destinataires', 'error');
             }
@@ -383,101 +749,199 @@
         }
     }
 
+    async function updateReportsUrl() {
+        const baseUrl = document.getElementById('reports-url-input').value.trim();
+        if (!baseUrl) {
+            showNotification('URL invalide', 'error');
+            return;
+        }
+        try {
+            const response = await fetch('/admin/api/config/reports-url', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reports_base_url: baseUrl})
+            });
+            const result = await response.json();
+            if (result.success) {
+                showNotification('URL mise à jour', 'success');
+            } else {
+                showNotification('Échec mise à jour de l’URL', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
     function renderExpenses(expenses) {
         const container = document.getElementById('expenses-list');
-
-        if (expenses.length === 0) {
-            container.innerHTML = '<div class="no-logs">Aucune dépense récurrente configurée</div>';
+        if (!expenses.length) {
+            container.innerHTML = '<div class="finance-empty">Aucune dépense récurrente configurée</div>';
             return;
         }
 
-        container.innerHTML = expenses.map(expense => `
-            <div class="expense-item">
-                <div class="expense-info">
-                    <div>
-                        <strong>${expense.identifiant || expense.libelle}</strong>
-                        <div style="font-size: 0.85rem; color: #6c757d;">${expense.libelle}</div>
+        container.innerHTML = expenses.map(expense => {
+            const tolerance = ((expense.montant_tolerance || 0.05) * 100).toFixed(0);
+            const occurrences = (expense.occurrences || []).slice(0, 6)
+                .map(occ => `<span class="occurrence-chip">${formatDateFr(occ.date)}</span>`).join('');
+
+            return `
+                <div class="finance-item">
+                    <div class="finance-info">
+                        <h4>${expense.identifiant || expense.libelle}</h4>
+                        <div class="finance-meta">
+                            ${expense.libelle} · ${expense.compte || 'Compte ?'} · ${expense.categorie || 'Catégorie ?'}
+                        </div>
+                        <div class="finance-meta">
+                            Jour ${expense.jour_prelevement || 5} · Mois: ${(expense.mois_occurrence || []).join(', ')}
+                        </div>
+                        <div class="occurrence-list">${occurrences || '<span class="helper-text">Prochains prélèvements indisponibles</span>'}</div>
                     </div>
-                    <div>${expense.montant}€</div>
-                    <div>${expense.categorie}</div>
-                    <div>±${((expense.montant_tolerance || 0.05) * 100).toFixed(0)}%</div>
+                    <div>
+                        <strong>${formatCurrency(expense.montant)}</strong><br>
+                        <small>Tolérance ±${tolerance}%</small>
+                    </div>
+                    <div>
+                        <small>${expense.commentaire || ''}</small>
+                    </div>
+                    <div class="finance-actions">
+                        <button class="btn btn-primary btn-small" onclick="editExpense(${expense.id})">✏️</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteExpense(${expense.id})">🗑️</button>
+                    </div>
                 </div>
-                <div class="expense-actions">
-                    <button class="btn btn-primary btn-small" onclick="editExpense(${expense.id})">✏️</button>
-                    <button class="btn btn-danger btn-small" onclick="deleteExpense(${expense.id})">🗑️</button>
+            `;
+        }).join('');
+    }
+
+    function renderRevenues(revenues) {
+        const container = document.getElementById('revenues-list');
+        if (!revenues.length) {
+            container.innerHTML = '<div class="finance-empty">Aucun revenu enregistré</div>';
+            return;
+        }
+
+        container.innerHTML = revenues.map(revenu => `
+            <div class="finance-item">
+                <div class="finance-info">
+                    <h4>${revenu.identifiant || revenu.libelle}</h4>
+                    <div class="finance-meta">
+                        ${revenu.libelle} · ${revenu.compte || 'Compte ?'} · ${revenu.categorie || 'Catégorie ?'}
+                    </div>
+                    <div class="finance-meta">${revenu.commentaire || ''}</div>
+                </div>
+                <div><strong>${formatCurrency(revenu.montant)}</strong></div>
+                <div class="finance-actions">
+                    <button class="btn btn-primary btn-small" onclick="editIncome(${revenu.id})">✏️</button>
+                    <button class="btn btn-danger btn-small" onclick="deleteIncome(${revenu.id})">🗑️</button>
                 </div>
             </div>
         `).join('');
+    }
+
+    function renderAdjustments(adjustments) {
+        const container = document.getElementById('adjustments-table');
+        if (!adjustments.length) {
+            container.innerHTML = '<div class="finance-empty">Aucun ajustement actif</div>';
+            return;
+        }
+
+        const rows = adjustments.map(adj => `
+            <tr>
+                <td>${adj.nom}</td>
+                <td>${formatCurrency(adj.montant)}</td>
+                <td>${formatDateFr(adj.date_debut)} → ${formatDateFr(adj.date_fin)}</td>
+                <td>${adj.commentaire || ''}</td>
+                <td class="finance-actions">
+                    <button class="btn btn-primary btn-small" onclick="editAdjustment(${adj.id})">✏️</button>
+                    <button class="btn btn-danger btn-small" onclick="deleteAdjustment(${adj.id})">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+
+        container.innerHTML = `
+            <table class="adjustments-table">
+                <thead>
+                    <tr>
+                        <th>Libellé</th>
+                        <th>Montant</th>
+                        <th>Période</th>
+                        <th>Commentaire</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
     }
 
     function showAddExpenseModal() {
         currentExpenseId = null;
         document.getElementById('modal-title').textContent = 'Ajouter une dépense';
         document.getElementById('modal-libelle').value = '';
+        document.getElementById('modal-identifiant').value = '';
+        document.getElementById('modal-compte').value = '';
+        document.getElementById('modal-categorie').value = '';
         document.getElementById('modal-montant').value = '';
         document.getElementById('modal-tolerance').value = '5';
-        document.getElementById('modal-categorie').value = '';
-        document.getElementById('modal-identifiant').value = '';
+        document.getElementById('modal-periodicite').value = 'mensuel';
+        document.getElementById('modal-jour').value = 5;
         document.getElementById('modal-commentaire').value = '';
+        setSelectedMonths(Array.from({length: 12}, (_, i) => i + 1));
         document.getElementById('expense-modal').classList.add('show');
     }
 
     async function editExpense(id) {
-        try {
-            const response = await fetch('/admin/api/config/expenses');
-            const data = await response.json();
-            const expense = data.depenses_fixes.find(e => e.id === id);
+        const expense = (financeCache.depenses_fixes || []).find(e => e.id === id);
+        if (!expense) return;
 
-            if (!expense) return;
-
-            currentExpenseId = id;
-            document.getElementById('modal-title').textContent = 'Modifier la dépense';
-            document.getElementById('modal-libelle').value = expense.libelle;
-            document.getElementById('modal-montant').value = expense.montant;
-            document.getElementById('modal-tolerance').value = (expense.montant_tolerance || 0.05) * 100;
-            document.getElementById('modal-categorie').value = expense.categorie || '';
-            document.getElementById('modal-identifiant').value = expense.identifiant || '';
-            document.getElementById('modal-commentaire').value = expense.commentaire || '';
-            document.getElementById('expense-modal').classList.add('show');
-        } catch (error) {
-            showNotification('Erreur chargement dépense', 'error');
-        }
+        currentExpenseId = id;
+        document.getElementById('modal-title').textContent = 'Modifier la dépense';
+        document.getElementById('modal-libelle').value = expense.libelle || '';
+        document.getElementById('modal-identifiant').value = expense.identifiant || '';
+        document.getElementById('modal-compte').value = expense.compte || '';
+        document.getElementById('modal-categorie').value = expense.categorie || '';
+        document.getElementById('modal-montant').value = expense.montant || '';
+        document.getElementById('modal-tolerance').value = ((expense.montant_tolerance || 0.05) * 100).toFixed(0);
+        document.getElementById('modal-jour').value = expense.jour_prelevement || 5;
+        document.getElementById('modal-commentaire').value = expense.commentaire || '';
+        const months = expense.mois_occurrence || [];
+        setSelectedMonths(months.length ? months : Array.from({length: 12}, (_, i) => i + 1));
+        document.getElementById('modal-periodicite').value = guessPeriodicite(selectedMonths);
+        document.getElementById('expense-modal').classList.add('show');
     }
 
     async function saveExpense() {
         const expense = {
-            libelle: document.getElementById('modal-libelle').value,
+            libelle: document.getElementById('modal-libelle').value.trim(),
+            identifiant: document.getElementById('modal-identifiant').value.trim(),
+            compte: document.getElementById('modal-compte').value.trim(),
+            categorie: document.getElementById('modal-categorie').value.trim(),
             montant: parseFloat(document.getElementById('modal-montant').value),
             montant_tolerance: parseFloat(document.getElementById('modal-tolerance').value) / 100,
-            categorie: document.getElementById('modal-categorie').value,
-            identifiant: document.getElementById('modal-identifiant').value,
+            periodicite: document.getElementById('modal-periodicite').value,
+            mois_occurrence: selectedMonths,
+            jour_prelevement: parseInt(document.getElementById('modal-jour').value, 10) || 5,
             commentaire: document.getElementById('modal-commentaire').value
         };
 
-        if (!expense.libelle || !expense.montant || !expense.categorie || !expense.identifiant) {
+        if (!expense.libelle || !expense.identifiant || !expense.categorie || Number.isNaN(expense.montant)) {
             showNotification('Tous les champs obligatoires doivent être remplis', 'error');
             return;
         }
 
+        const url = currentExpenseId ? `/admin/api/config/expenses/${currentExpenseId}` : '/admin/api/config/expenses';
+        const method = currentExpenseId ? 'PUT' : 'POST';
+
         try {
-            const url = currentExpenseId
-                ? `/admin/api/config/expenses/${currentExpenseId}`
-                : '/admin/api/config/expenses';
-
-            const method = currentExpenseId ? 'PUT' : 'POST';
-
             const response = await fetch(url, {
-                method: method,
+                method,
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(expense)
             });
-
             const result = await response.json();
-
             if (result.success) {
                 showNotification(result.message, 'success');
                 closeExpenseModal();
-                await loadExpenses();
+                await loadFinance();
             } else {
                 showNotification(result.message, 'error');
             }
@@ -488,17 +952,12 @@
 
     async function deleteExpense(id) {
         if (!confirm('Voulez-vous vraiment supprimer cette dépense ?')) return;
-
         try {
-            const response = await fetch(`/admin/api/config/expenses/${id}`, {
-                method: 'DELETE'
-            });
-
+            const response = await fetch(`/admin/api/config/expenses/${id}`, {method: 'DELETE'});
             const result = await response.json();
-
             if (result.success) {
                 showNotification(result.message, 'success');
-                await loadExpenses();
+                await loadFinance();
             } else {
                 showNotification(result.message, 'error');
             }
@@ -511,7 +970,169 @@
         document.getElementById('expense-modal').classList.remove('show');
     }
 
-    // Charger au démarrage
+    function showAddIncomeModal() {
+        currentIncomeId = null;
+        document.getElementById('income-modal-title').textContent = 'Ajouter un revenu';
+        document.getElementById('income-libelle').value = '';
+        document.getElementById('income-identifiant').value = '';
+        document.getElementById('income-compte').value = '';
+        document.getElementById('income-categorie').value = 'Revenus';
+        document.getElementById('income-montant').value = '';
+        document.getElementById('income-commentaire').value = '';
+        document.getElementById('income-modal').classList.add('show');
+    }
+
+    function editIncome(id) {
+        const revenu = (financeCache.revenus || []).find(r => r.id === id);
+        if (!revenu) return;
+        currentIncomeId = id;
+        document.getElementById('income-modal-title').textContent = 'Modifier le revenu';
+        document.getElementById('income-libelle').value = revenu.libelle || '';
+        document.getElementById('income-identifiant').value = revenu.identifiant || '';
+        document.getElementById('income-compte').value = revenu.compte || '';
+        document.getElementById('income-categorie').value = revenu.categorie || 'Revenus';
+        document.getElementById('income-montant').value = revenu.montant || '';
+        document.getElementById('income-commentaire').value = revenu.commentaire || '';
+        document.getElementById('income-modal').classList.add('show');
+    }
+
+    async function saveIncome() {
+        const income = {
+            libelle: document.getElementById('income-libelle').value.trim(),
+            identifiant: document.getElementById('income-identifiant').value.trim(),
+            compte: document.getElementById('income-compte').value.trim(),
+            categorie: document.getElementById('income-categorie').value.trim(),
+            montant: parseFloat(document.getElementById('income-montant').value),
+            commentaire: document.getElementById('income-commentaire').value
+        };
+
+        if (!income.libelle || !income.identifiant || Number.isNaN(income.montant)) {
+            showNotification('Champs requis manquants pour le revenu', 'error');
+            return;
+        }
+
+        const url = currentIncomeId ? `/admin/api/config/revenues/${currentIncomeId}` : '/admin/api/config/revenues';
+        const method = currentIncomeId ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(income)
+            });
+            const result = await response.json();
+            if (result.success) {
+                showNotification(result.message, 'success');
+                closeIncomeModal();
+                await loadFinance();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function deleteIncome(id) {
+        if (!confirm('Supprimer ce revenu ?')) return;
+        try {
+            const response = await fetch(`/admin/api/config/revenues/${id}`, {method: 'DELETE'});
+            const result = await response.json();
+            if (result.success) {
+                showNotification(result.message, 'success');
+                await loadFinance();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    function closeIncomeModal() {
+        document.getElementById('income-modal').classList.remove('show');
+    }
+
+    function showAddAdjustmentModal() {
+        currentAdjustmentId = null;
+        document.getElementById('adjustment-modal-title').textContent = 'Ajouter un ajustement';
+        document.getElementById('adjustment-nom').value = '';
+        document.getElementById('adjustment-montant').value = '';
+        document.getElementById('adjustment-debut').value = '';
+        document.getElementById('adjustment-fin').value = '';
+        document.getElementById('adjustment-commentaire').value = '';
+        document.getElementById('adjustment-modal').classList.add('show');
+    }
+
+    function editAdjustment(id) {
+        const adj = (financeCache.ajustements_budget || []).find(a => a.id === id);
+        if (!adj) return;
+        currentAdjustmentId = id;
+        document.getElementById('adjustment-modal-title').textContent = 'Modifier un ajustement';
+        document.getElementById('adjustment-nom').value = adj.nom || '';
+        document.getElementById('adjustment-montant').value = adj.montant || '';
+        document.getElementById('adjustment-debut').value = adj.date_debut || '';
+        document.getElementById('adjustment-fin').value = adj.date_fin || '';
+        document.getElementById('adjustment-commentaire').value = adj.commentaire || '';
+        document.getElementById('adjustment-modal').classList.add('show');
+    }
+
+    async function saveAdjustment() {
+        const adjustment = {
+            nom: document.getElementById('adjustment-nom').value.trim(),
+            montant: parseFloat(document.getElementById('adjustment-montant').value),
+            date_debut: document.getElementById('adjustment-debut').value,
+            date_fin: document.getElementById('adjustment-fin').value,
+            commentaire: document.getElementById('adjustment-commentaire').value
+        };
+
+        if (!adjustment.nom || Number.isNaN(adjustment.montant) || !adjustment.date_debut || !adjustment.date_fin) {
+            showNotification('Merci de compléter toutes les informations de l’ajustement', 'error');
+            return;
+        }
+
+        const url = currentAdjustmentId ? `/admin/api/config/adjustments/${currentAdjustmentId}` : '/admin/api/config/adjustments';
+        const method = currentAdjustmentId ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(adjustment)
+            });
+            const result = await response.json();
+            if (result.success) {
+                showNotification(result.message, 'success');
+                closeAdjustmentModal();
+                await loadFinance();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function deleteAdjustment(id) {
+        if (!confirm('Supprimer cet ajustement ?')) return;
+        try {
+            const response = await fetch(`/admin/api/config/adjustments/${id}`, {method: 'DELETE'});
+            const result = await response.json();
+            if (result.success) {
+                showNotification(result.message, 'success');
+                await loadFinance();
+            } else {
+                showNotification(result.message, 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    function closeAdjustmentModal() {
+        document.getElementById('adjustment-modal').classList.remove('show');
+    }
+
     loadConfig();
 </script>
 {% endblock %}

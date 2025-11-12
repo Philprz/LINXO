@@ -328,43 +328,43 @@ AUCUN rapport budget n'a été envoyé.
             # Vérifier que REPORTS_BASE_URL est configuré
             base_url = os.getenv('REPORTS_BASE_URL')
             if not base_url:
-                print("[WARNING] REPORTS_BASE_URL non configure, rapports HTML desactives")
-                print("[INFO] Definissez REPORTS_BASE_URL dans .env pour activer les rapports")
-            else:
-                # Convertir les données en DataFrame
-                all_transactions = (
-                    analysis_result.get('depenses_fixes', []) +
-                    analysis_result.get('depenses_variables', [])
+                base_url = "https://linxo.appliprz.ovh/reports"
+                print(f"[INFO] REPORTS_BASE_URL non defini, utilisation de {base_url}")
+
+            # Convertir les données en DataFrame
+            all_transactions = (
+                analysis_result.get('depenses_fixes', []) +
+                analysis_result.get('depenses_variables', [])
+            )
+
+            if all_transactions:
+                # Créer le DataFrame
+                df_data = []
+                for trans in all_transactions:
+                    df_data.append({
+                        'date': trans.get('date_str', ''),
+                        'libelle': trans.get('libelle', ''),
+                        'montant': trans.get('montant', 0),
+                        'categorie': trans.get('categorie', 'Non classé'),
+                        'date_str': trans.get('date_str', '')
+                    })
+
+                df = pd.DataFrame(df_data)
+
+                # Générer les rapports
+                signing_key = os.getenv('REPORTS_SIGNING_KEY')
+                report_index = build_daily_report(
+                    df,
+                    report_date=None,  # Aujourd'hui par défaut
+                    base_url=base_url,
+                    signing_key=signing_key
                 )
 
-                if all_transactions:
-                    # Créer le DataFrame
-                    df_data = []
-                    for trans in all_transactions:
-                        df_data.append({
-                            'date': trans.get('date_str', ''),
-                            'libelle': trans.get('libelle', ''),
-                            'montant': trans.get('montant', 0),
-                            'categorie': trans.get('categorie', 'Non classé'),
-                            'date_str': trans.get('date_str', '')
-                        })
-
-                    df = pd.DataFrame(df_data)
-
-                    # Générer les rapports
-                    signing_key = os.getenv('REPORTS_SIGNING_KEY')
-                    report_index = build_daily_report(
-                        df,
-                        report_date=None,  # Aujourd'hui par défaut
-                        base_url=base_url,
-                        signing_key=signing_key
-                    )
-
-                    print(f"[SUCCESS] Rapports HTML generes dans {report_index.base_dir}")
-                    print(f"  - {len(report_index.families)} familles de depenses")
-                    print(f"  - Total: {report_index.grand_total:.2f}E")
-                else:
-                    print("[WARNING] Aucune transaction a reporter")
+                print(f"[SUCCESS] Rapports HTML generes dans {report_index.base_dir}")
+                print(f"  - {len(report_index.families)} familles de depenses")
+                print(f"  - Total: {report_index.grand_total:.2f}E")
+            else:
+                print("[WARNING] Aucune transaction a reporter")
 
         except ValueError as ve:
             # Erreur de configuration (REPORTS_BASE_URL manquant)

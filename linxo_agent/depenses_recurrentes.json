@@ -377,6 +377,7 @@
     "total_revenus": 4745.87,
     "budget_variable_max": 1700
   },
+  "ajustements_budget": [],
   "familles_depenses": [
     {
       "nom": "Transports Personnel",

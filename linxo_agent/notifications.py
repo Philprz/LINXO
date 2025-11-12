@@ -551,7 +551,7 @@ class NotificationManager:
                 )
                 template = env.get_template("daily_summary.html.j2")
 
-                base_url = _os.getenv("REPORTS_BASE_URL", "")
+                base_url = _os.getenv("REPORTS_BASE_URL") or "https://linxo.appliprz.ovh/reports"
                 index_url = "#"
                 if base_url:
                     report_date = getattr(report_index, "report_date", "")
@@ -675,9 +675,6 @@ class NotificationManager:
         except Exception:  # pylint: disable=broad-except
             html_body = None
 
-        csv_path = analysis_result.get("csv_path")
-        attachments = [csv_path] if isinstance(csv_path, (str, Path)) else None
-
         sms_ok = self.send_sms_ovh(sms_msg) if sms_msg else False
         email_ok = self.send_email(
             subject=subject,
@@ -687,7 +684,7 @@ class NotificationManager:
                 f"{budget_max:.0f}€ (reste {reste:.0f}€)"
             ),
             html_body=html_body,
-            attachments=attachments,
+            attachments=None,
         )
 
         return {"email": email_ok, "sms": sms_ok}

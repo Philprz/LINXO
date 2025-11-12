@@ -243,12 +243,11 @@ Une intervention technique est nécessaire pour corriger ce problème.
         df = pd.DataFrame(df_data)
 
         # Récupérer les variables d'environnement pour les rapports
-        base_url = os.getenv('REPORTS_BASE_URL')
+        base_url = os.getenv('REPORTS_BASE_URL') or "https://linxo.appliprz.ovh/reports"
         signing_key = os.getenv('REPORTS_SIGNING_KEY')
 
-        if not base_url:
-            print("[WARN] REPORTS_BASE_URL non defini, rapports generes sans URLs")
-            base_url = "http://localhost"
+        if not os.getenv('REPORTS_BASE_URL'):
+            print(f"[INFO] REPORTS_BASE_URL non defini, utilisation de {base_url}")
 
         # Générer le conseil du LLM
         from analyzer import generer_conseil_budget

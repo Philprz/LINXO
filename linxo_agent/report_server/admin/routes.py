@@ -4,12 +4,14 @@
 Routes de l'interface d'administration
 """
 
+import calendar
+import hashlib
 import os
 import platform
 import psutil
 import subprocess
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -19,6 +21,9 @@ from .auth import verify_admin_auth
 from .executor import executor
 from .logs_manager import logs_manager
 from .config_manager import config_manager
+from .feedback_manager import feedback_manager
+from linxo_agent.analyzer import lire_csv_linxo, analyser_transactions
+from linxo_agent.config import get_config
 
 # Configuration
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -30,6 +35,178 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 DATA_DIR = BASE_DIR / "data"
 LOGS_DIR = BASE_DIR / "logs"
 REPORTS_DIR = DATA_DIR / "reports"
+
+PERIODICITY_MONTHS = {
+    'mensuel': list(range(1, 13)),
+    'bimestriel': [1, 3, 5, 7, 9, 11],
+    'trimestriel': [1, 4, 7, 10],
+    'semestriel': [1, 7],
+    'annuel': [1],
+}
+DEFAULT_OCCURRENCE_DAY = 5
+
+
+def _parse_date(value: Optional[str]) -> Optional[date]:
+    """Parse divers formats de date simples."""
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def _normalize_months(entry: Dict[str, Any]) -> List[int]:
+    """Retourne la liste des mois sélectionnés pour une entrée finance."""
+    raw_months = entry.get('mois_occurrence')
+    if not raw_months:
+        periodicite = str(entry.get('periodicite', 'mensuel')).lower()
+        raw_months = PERIODICITY_MONTHS.get(periodicite, list(range(1, 13)))
+
+    normalized: List[int] = []
+    for value in raw_months:
+        try:
+            month_value = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= month_value <= 12:
+            normalized.append(month_value)
+
+    if not normalized:
+        normalized = list(range(1, 13))
+
+    normalized = sorted(set(normalized))
+    entry['mois_occurrence'] = normalized
+    return normalized
+
+
+def _sanitize_day(value: Any) -> int:
+    """Normalise le jour de prélèvement."""
+    try:
+        day_value = int(value)
+    except (TypeError, ValueError):
+        day_value = DEFAULT_OCCURRENCE_DAY
+    return max(1, min(day_value, 31))
+
+
+def _compute_occurrences(entry: Dict[str, Any], count: int = 12) -> List[Dict[str, Any]]:
+    """Calcule les prochaines occurrences d'une dépense ou d'un revenu."""
+    months = _normalize_months(entry)
+    day = _sanitize_day(entry.get('jour_prelevement'))
+    entry['jour_prelevement'] = day
+
+    today = date.today()
+    occurrences: List[Dict[str, Any]] = []
+    pointer = 0
+    horizon_months = 48  # sécurité
+
+    while len(occurrences) < count and pointer < horizon_months:
+        target_month = ((today.month - 1 + pointer) % 12) + 1
+        target_year = today.year + ((today.month - 1 + pointer) // 12)
+        pointer += 1
+
+        if target_month not in months:
+            continue
+
+        day_in_month = min(day, calendar.monthrange(target_year, target_month)[1])
+        occurrence_date = date(target_year, target_month, day_in_month)
+        if occurrence_date < today:
+            continue
+
+        occurrences.append({
+            'date': occurrence_date.isoformat(),
+            'montant': float(entry.get('montant', 0) or 0),
+            'mois': target_month,
+            'annee': occurrence_date.year
+        })
+
+    return occurrences
+
+
+def _apply_finance_metadata(finance_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Enrichit les données financières avec les occurrences futures."""
+    for key in ('depenses_fixes', 'revenus'):
+        for item in finance_data.get(key, []):
+            occurrences = _compute_occurrences(item)
+            item['occurrences'] = occurrences
+            item['prochaine_occurrence'] = occurrences[0]['date'] if occurrences else None
+    return finance_data
+
+
+def _active_adjustments(adjustments: List[Dict[str, Any]]) -> float:
+    """Retourne la somme des ajustements actifs aujourd'hui."""
+    today = date.today()
+    total = 0.0
+    for adj in adjustments:
+        try:
+            montant = float(adj.get('montant', 0) or 0)
+        except (TypeError, ValueError):
+            montant = 0.0
+
+        start = _parse_date(adj.get('date_debut')) or date.min
+        end = _parse_date(adj.get('date_fin')) or date.max
+        if start <= today <= end:
+            total += montant
+    return total
+
+
+def _compute_budget_preview(finance_data: Dict[str, Any]) -> Dict[str, float]:
+    """Calcule les totaux revenus/dépenses pour l'interface."""
+    current_month = datetime.now().month
+    total_revenus = sum(
+        float(r.get('montant', 0) or 0)
+        for r in finance_data.get('revenus', [])
+    )
+
+    total_depenses = 0.0
+    for depense in finance_data.get('depenses_fixes', []):
+        months = depense.get('mois_occurrence') or _normalize_months(depense)
+        if current_month in months:
+            try:
+                total_depenses += float(depense.get('montant', 0) or 0)
+            except (TypeError, ValueError):
+                continue
+
+    ajustements_actifs = _active_adjustments(finance_data.get('ajustements_budget', []))
+    budget_estime = total_revenus - total_depenses + ajustements_actifs
+
+    return {
+        'revenus_total': round(total_revenus, 2),
+        'depenses_fixes_mois': round(total_depenses, 2),
+        'ajustements_actifs': round(ajustements_actifs, 2),
+        'budget_estime': round(budget_estime, 2),
+    }
+
+
+def _hash_transaction(transaction: Dict[str, Any]) -> str:
+    """Construit un identifiant stable pour une transaction."""
+    raw = "|".join([
+        str(transaction.get('date_str', '')).strip(),
+        str(transaction.get('libelle', '')).strip(),
+        str(transaction.get('montant', '')).strip(),
+        str(transaction.get('compte', '')).strip(),
+    ])
+    return hashlib.sha1(raw.encode('utf-8', errors='ignore')).hexdigest()
+
+
+def _serialize_transaction(transaction: Dict[str, Any]) -> Dict[str, Any]:
+    """Formate une transaction pour l'API de reclassification."""
+    montant = float(transaction.get('montant', 0) or 0)
+    return {
+        'id': _hash_transaction(transaction),
+        'date': transaction.get('date_str'),
+        'libelle': transaction.get('libelle'),
+        'montant': abs(montant),
+        'categorie': transaction.get('categorie', 'Non classé'),
+        'compte': transaction.get('compte', ''),
+        'notes': transaction.get('notes', ''),
+        'labels': transaction.get('labels', ''),
+        'ml_confidence': transaction.get('ml_confidence'),
+        'depense_recurrente': transaction.get('depense_recurrente'),
+        'categorie_fixe': transaction.get('categorie_fixe'),
+    }
 
 
 def get_system_status() -> Dict[str, Any]:
@@ -288,6 +465,24 @@ async def admin_config(
     )
 
 
+@router.get("/classification", response_class=HTMLResponse)
+async def admin_classification(
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """
+    Page de gestion des corrections de classification
+    """
+    return templates.TemplateResponse(
+        "classification.html",
+        {
+            "request": request,
+            "page_title": "Corrections",
+            "active_page": "classification"
+        }
+    )
+
+
 # ============================================================================
 # ENDPOINTS D'ACTIONS MANUELLES (Phase 3)
 # ============================================================================
@@ -448,8 +643,6 @@ async def api_test_email(
 import sys
 sys.path.insert(0, '.')
 from linxo_agent.notifications import send_email_notification
-from linxo_agent.config import get_config
-
 config = get_config()
 result = send_email_notification(
     subject='[TEST] Email de test depuis interface admin',
@@ -692,6 +885,35 @@ async def api_update_budget(
     })
 
 
+@router.get("/api/config/reports-url")
+async def api_get_reports_url(
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Retourne l'URL publique configurée pour les rapports."""
+    return JSONResponse(content=config_manager.get_reports_base_url())
+
+
+@router.put("/api/config/reports-url")
+async def api_update_reports_url(
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Met à jour l'URL publique des rapports."""
+    data = await request.json()
+    base_url = data.get('reports_base_url')
+    if not base_url:
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'reports_base_url requis'}
+        )
+
+    success = config_manager.update_reports_base_url(base_url)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'URL mise à jour' if success else 'Échec mise à jour'
+    })
+
+
 @router.get("/api/config/recipients")
 async def api_get_recipients(
     authenticated: bool = Depends(verify_admin_auth)
@@ -725,8 +947,10 @@ async def api_get_expenses(
     authenticated: bool = Depends(verify_admin_auth)
 ):
     """Récupère toutes les dépenses récurrentes"""
-    expenses = config_manager.get_expenses()
-    return JSONResponse(content=expenses)
+    finance_data = config_manager.get_expenses()
+    _apply_finance_metadata(finance_data)
+    finance_data['budget_preview'] = _compute_budget_preview(finance_data)
+    return JSONResponse(content=finance_data)
 
 
 @router.post("/api/config/expenses")
@@ -782,4 +1006,290 @@ async def api_delete_expense(
     return JSONResponse(content={
         'success': success,
         'message': 'Dépense supprimée' if success else 'Échec suppression'
+    })
+
+
+# ---------------------------------------------------------------------------
+# Revenus
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/config/revenues")
+async def api_add_income(
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Ajoute un revenu."""
+    income = await request.json()
+    required_fields = ['libelle', 'montant', 'categorie', 'identifiant']
+    for field in required_fields:
+        if not income.get(field):
+            return JSONResponse(
+                status_code=400,
+                content={'success': False, 'error': f'Champ {field} requis'}
+            )
+
+    try:
+        income['montant'] = float(income.get('montant', 0))
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Montant invalide'}
+        )
+
+    success = config_manager.add_income(income)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'Revenu ajouté' if success else 'Échec ajout'
+    })
+
+
+@router.put("/api/config/revenues/{income_id}")
+async def api_update_income(
+    income_id: int,
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Met à jour un revenu."""
+    income = await request.json()
+    try:
+        income['montant'] = float(income.get('montant', 0))
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Montant invalide'}
+        )
+
+    success = config_manager.update_income(income_id, income)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'Revenu mis à jour' if success else 'Échec mise à jour'
+    })
+
+
+@router.delete("/api/config/revenues/{income_id}")
+async def api_delete_income(
+    income_id: int,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Supprime un revenu."""
+    success = config_manager.delete_income(income_id)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'Revenu supprimé' if success else 'Échec suppression'
+    })
+
+
+# ---------------------------------------------------------------------------
+# Ajustements budget
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/config/adjustments")
+async def api_add_adjustment(
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Ajoute un ajustement manuel."""
+    adjustment = await request.json()
+    required_fields = ['nom', 'montant', 'date_debut', 'date_fin']
+    for field in required_fields:
+        if not adjustment.get(field):
+            return JSONResponse(
+                status_code=400,
+                content={'success': False, 'error': f'Champ {field} requis'}
+            )
+
+    try:
+        adjustment['montant'] = float(adjustment.get('montant', 0))
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Montant invalide'}
+        )
+
+    success = config_manager.add_budget_adjustment(adjustment)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'Ajustement ajouté' if success else 'Échec ajout'
+    })
+
+
+@router.put("/api/config/adjustments/{adjustment_id}")
+async def api_update_adjustment(
+    adjustment_id: int,
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Met à jour un ajustement."""
+    adjustment = await request.json()
+    try:
+        adjustment['montant'] = float(adjustment.get('montant', 0))
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Montant invalide'}
+        )
+
+    success = config_manager.update_budget_adjustment(adjustment_id, adjustment)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'Ajustement mis à jour' if success else 'Échec mise à jour'
+    })
+
+
+@router.delete("/api/config/adjustments/{adjustment_id}")
+async def api_delete_adjustment(
+    adjustment_id: int,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Supprime un ajustement."""
+    success = config_manager.delete_budget_adjustment(adjustment_id)
+    return JSONResponse(content={
+        'success': success,
+        'message': 'Ajustement supprimé' if success else 'Échec suppression'
+    })
+
+
+# ---------------------------------------------------------------------------
+# Reclassification & feedback ML
+# ---------------------------------------------------------------------------
+
+
+def _load_latest_variable_transactions() -> Dict[str, Any]:
+    """Lit le CSV le plus récent et renvoie les transactions variables."""
+    latest_csv = DATA_DIR / "latest.csv"
+    if not latest_csv.exists():
+        raise FileNotFoundError("Aucun fichier latest.csv trouvé")
+
+    transactions, _ = lire_csv_linxo(str(latest_csv))
+    if not transactions:
+        return {'csv': latest_csv, 'transactions': []}
+
+    analysis = analyser_transactions(
+        transactions,
+        use_ml=True,
+        enable_learning=False,
+        enable_familles=False
+    )
+    return {
+        'csv': latest_csv,
+        'transactions': analysis.get('depenses_variables', [])
+    }
+
+
+@router.get("/api/classification/transactions")
+async def api_get_classification_transactions(
+    limit: int = 100,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Retourne les dernières transactions variables pour validation."""
+    limit = max(1, min(limit, 500))
+    try:
+        payload = _load_latest_variable_transactions()
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={'success': False, 'error': 'Aucun CSV disponible'}
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={'success': False, 'error': f'Analyse impossible: {exc}'}
+        )
+
+    serialized = [_serialize_transaction(tx) for tx in payload['transactions']]
+    serialized.sort(key=lambda item: _parse_date(item.get('date')) or date.min, reverse=True)
+    limited = serialized[:limit]
+
+    return JSONResponse(content={
+        'success': True,
+        'transactions': limited,
+        'total': len(serialized),
+        'source_csv': str(payload['csv']),
+        'generated_at': datetime.utcnow().isoformat()
+    })
+
+
+@router.post("/api/classification/feedback")
+async def api_post_classification_feedback(
+    request: Request,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Enregistre un feedback utilisateur (correction ou validation)."""
+    data = await request.json()
+    statut = str(data.get('statut', 'corrige')).lower()
+    if statut not in {'corrige', 'correct'}:
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Statut invalide'}
+        )
+
+    if not data.get('transaction_id'):
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'transaction_id requis'}
+        )
+
+    if statut == 'corrige' and not data.get('categorie_corrigee'):
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Nouvelle catégorie requise'}
+        )
+
+    try:
+        montant = float(data.get('montant', 0) or 0)
+    except (TypeError, ValueError):
+        montant = 0.0
+
+    feedback_payload = {
+        'transaction_id': data.get('transaction_id'),
+        'libelle': data.get('libelle', ''),
+        'categorie_initiale': data.get('categorie_initiale'),
+        'categorie_corrigee': data.get('categorie_corrigee') if statut == 'corrige' else data.get('categorie_initiale'),
+        'statut': statut,
+        'commentaire': data.get('commentaire'),
+        'montant': montant,
+        'compte': data.get('compte'),
+        'date_transaction': data.get('date_transaction', data.get('date')),
+        'confiance': data.get('ml_confidence'),
+    }
+
+    feedback_id = feedback_manager.add_feedback(feedback_payload)
+
+    ml_updated = False
+    if statut == 'corrige' and feedback_payload['categorie_corrigee'] and (
+        feedback_payload['categorie_corrigee'] != feedback_payload['categorie_initiale']
+    ):
+        try:
+            from linxo_agent.smart_classifier import create_classifier
+            classifier = create_classifier()
+            classifier.record_correction(
+                description=feedback_payload['libelle'] or '',
+                old_category=feedback_payload['categorie_initiale'] or 'Non classé',
+                new_category=feedback_payload['categorie_corrigee'],
+                montant=montant
+            )
+            ml_updated = True
+        except Exception:
+            ml_updated = False
+
+    return JSONResponse(content={
+        'success': True,
+        'feedback_id': feedback_id,
+        'ml_updated': ml_updated
+    })
+
+
+@router.get("/api/classification/feedback")
+async def api_get_feedback_history(
+    limit: int = 50,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Retourne l'historique des corrections."""
+    limit = max(1, min(limit, 200))
+    history = feedback_manager.list_feedback(limit)
+    return JSONResponse(content={
+        'success': True,
+        'history': history
     })

@@ -9,7 +9,7 @@ import os
 import sys
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -117,6 +117,33 @@ class Config:
 
         return total
 
+    def _calculate_active_adjustments(self, current_date: date) -> float:
+        """Calcule la somme des ajustements actifs pour la date fournie."""
+        total = 0.0
+        for ajustement in self.depenses_data.get('ajustements_budget', []):
+            try:
+                montant = float(ajustement.get('montant', 0) or 0)
+            except (TypeError, ValueError):
+                montant = 0.0
+
+            debut_str = ajustement.get('date_debut')
+            fin_str = ajustement.get('date_fin')
+
+            try:
+                date_debut = datetime.strptime(debut_str, '%Y-%m-%d').date() if debut_str else date.min
+            except (TypeError, ValueError):
+                date_debut = date.min
+
+            try:
+                date_fin = datetime.strptime(fin_str, '%Y-%m-%d').date() if fin_str else date.max
+            except (TypeError, ValueError):
+                date_fin = date.max
+
+            if date_debut <= current_date <= date_fin:
+                total += montant
+
+        return total
+
     def _load_depenses_config(self):
         """Charge la configuration des dépenses depuis .env et JSON"""
         # Charger le fichier depenses_recurrentes.json si disponible
@@ -124,6 +151,9 @@ class Config:
             try:
                 with open(self.depenses_file, 'r', encoding='utf-8') as f:
                     self.depenses_data = json.load(f)
+
+                # S'assurer que les nouvelles structures existent
+                self.depenses_data.setdefault('ajustements_budget', [])
 
                 # Calculer le budget variable depuis le JSON pour le mois courant
                 mois_courant = datetime.now().month
@@ -136,8 +166,11 @@ class Config:
                 # Calculer les dépenses fixes du mois courant
                 total_depenses_fixes_mois = self._calculate_monthly_fixed_expenses(mois_courant)
 
+                # Ajustements actifs (bonus/malus)
+                ajustement_total = self._calculate_active_adjustments(datetime.now().date())
+
                 # Arrondir au 100 le plus proche
-                budget_brut = total_revenus - total_depenses_fixes_mois
+                budget_brut = total_revenus - total_depenses_fixes_mois + ajustement_total
                 self.budget_variable = round(budget_brut / 100) * 100
 
                 # Mettre à jour les totaux dans le JSON (pour cohérence)
@@ -148,6 +181,7 @@ class Config:
                     total_depenses_fixes_mois
                 )
                 self.depenses_data['totaux']['budget_variable_mois_courant'] = self.budget_variable
+                self.depenses_data['totaux']['ajustements_actifs'] = ajustement_total
 
                 depenses_count = len(self.depenses_data.get('depenses_fixes', []))
                 print(f"[OK] Depenses recurrentes chargees: {depenses_count} depenses fixes")
