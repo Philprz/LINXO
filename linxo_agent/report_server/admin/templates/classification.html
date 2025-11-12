@@ -135,6 +135,12 @@
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 1rem;
     }
+
+    .helper-note {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.3rem;
+    }
 </style>
 {% endblock %}
 
@@ -218,6 +224,13 @@
                     <option value="recurrente">Récurrente</option>
                 </select>
             </div>
+            <div class="form-group" id="recurrence-mapping-group" style="display:none;">
+                <label class="form-label">Associer à une dépense récurrente</label>
+                <select class="form-select" id="recurrence-target">
+                    <option value="">Créer une nouvelle dépense récurrente</option>
+                </select>
+                <div class="helper-note" id="recurrence-helper-note"></div>
+            </div>
         </div>
         <div class="form-group">
             <label class="form-label">Commentaire</label>
@@ -237,6 +250,7 @@
     let transactionsCache = [];
     let currentTransactionId = null;
     let categoriesCache = [];
+    let recurrenceSuggestions = [];
 
     const currencyFormatter = new Intl.NumberFormat('fr-FR', {
         style: 'currency',
@@ -379,6 +393,7 @@
         if (typeSelect) {
             typeSelect.value = tx.depense_recurrente ? 'recurrente' : 'variable';
         }
+        updateRecurrenceUI(tx);
         document.getElementById('correction-modal').classList.add('show');
     }
 
@@ -393,6 +408,7 @@
         const nouvelleCategorie = document.getElementById('correction-categorie-nouvelle').value.trim();
         const commentaire = document.getElementById('correction-commentaire').value.trim();
         const nouveauType = document.getElementById('correction-type').value;
+        const recurrenceTargetId = document.getElementById('recurrence-target').value || null;
 
         if (!nouvelleCategorie) {
             showNotification('Merci de proposer une nouvelle catégorie', 'error');
@@ -415,7 +431,8 @@
                     date_transaction: tx.date,
                     ml_confidence: tx.ml_confidence,
                     type_initial: tx.depense_recurrente ? 'recurrente' : 'variable',
-                    type_corrige: nouveauType
+                    type_corrige: nouveauType,
+                    recurrence_target_id: recurrenceTargetId
                 })
             });
             const result = await response.json();
@@ -467,6 +484,54 @@
             console.error('Erreur historique corrections:', error);
         }
     }
+
+    async function updateRecurrenceUI(tx) {
+        const group = document.getElementById('recurrence-mapping-group');
+        const select = document.getElementById('recurrence-target');
+        const note = document.getElementById('recurrence-helper-note');
+        if (!group || !select || !note) return;
+
+        const typeValue = document.getElementById('correction-type').value;
+        if (typeValue !== 'recurrente') {
+            group.style.display = 'none';
+            select.value = '';
+            note.textContent = '';
+            return;
+        }
+
+        group.style.display = 'block';
+        note.textContent = 'Recherche des correspondances...';
+        select.innerHTML = '<option value="">Créer une nouvelle dépense récurrente</option>';
+
+        try {
+            const response = await fetch(`/admin/api/classification/recurrence-suggestions?libelle=${encodeURIComponent(tx.libelle || '')}&montant=${Math.abs(tx.montant || 0)}`);
+            const data = await response.json();
+            recurrenceSuggestions = data.success ? (data.suggestions || []) : [];
+        } catch (error) {
+            recurrenceSuggestions = [];
+        }
+
+        if (!recurrenceSuggestions.length) {
+            note.textContent = 'Aucune dépense récurrente similaire détectée.';
+            return;
+        }
+
+        const options = ['<option value=\"\">Créer une nouvelle dépense récurrente</option>']
+            .concat(recurrenceSuggestions.map(item => `
+                <option value=\"${item.id}\">
+                    ${item.libelle} (${formatCurrency(item.montant || 0)})
+                </option>
+            `));
+        select.innerHTML = options.join('');
+        select.value = recurrenceSuggestions[0]?.id || '';
+        note.textContent = 'Sélectionnez une dépense existante ou laissez vide pour en créer une nouvelle.';
+    }
+
+    document.getElementById('correction-type').addEventListener('change', () => {
+        if (!currentTransactionId) return;
+        const tx = transactionsCache.find(t => t.id === currentTransactionId);
+        if (tx) updateRecurrenceUI(tx);
+    });
 
     loadCategories().then(() => {
         loadTransactions();

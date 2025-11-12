@@ -11,6 +11,7 @@ import platform
 import psutil
 import re
 import subprocess
+from difflib import SequenceMatcher
 from pathlib import Path
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -214,7 +215,73 @@ def _find_matching_expense(expenses: List[Dict[str, Any]], pattern: str) -> Opti
     return None
 
 
-def _apply_recurrence_change(data: Dict[str, Any], target_type: str, categorie: Optional[str] = None) -> bool:
+def _find_expense_by_id(expenses: List[Dict[str, Any]], expense_id: int) -> Optional[Dict[str, Any]]:
+    for expense in expenses:
+        if expense.get('id') == expense_id:
+            return expense
+    return None
+
+
+def _suggest_recurring_candidates(libelle: str, montant: float, limit: int = 5) -> List[Dict[str, Any]]:
+    """Propose des dépenses récurrentes proches du libellé donné."""
+    pattern = _normalize_libelle_pattern(libelle)
+    if not pattern:
+        return []
+
+    try:
+        finance_data = config_manager.get_expenses()
+    except Exception:
+        return []
+
+    expenses = finance_data.get('depenses_fixes', [])
+    suggestions: List[Dict[str, Any]] = []
+
+    for expense in expenses:
+        labels = _ensure_label_list(expense.get('libelle'))
+        if not labels:
+            continue
+
+        best_label_score = 0.0
+        for lbl in labels:
+            normalized = _normalize_libelle_pattern(lbl)
+            if not normalized:
+                continue
+            score = SequenceMatcher(None, normalized, pattern).ratio()
+            if normalized in pattern or pattern in normalized:
+                score += 0.2
+            best_label_score = max(best_label_score, score)
+
+        try:
+            exp_amount = abs(float(expense.get('montant', 0) or 0))
+        except (TypeError, ValueError):
+            exp_amount = 0.0
+
+        montant_score = 0.0
+        if montant and exp_amount:
+            montant_score = max(0.0, 1.0 - abs(exp_amount - montant) / max(exp_amount, montant))
+
+        final_score = (best_label_score * 0.7) + (montant_score * 0.3)
+        if final_score < 0.3:
+            continue
+
+        suggestions.append({
+            'id': expense.get('id'),
+            'libelle': labels[0],
+            'categorie': expense.get('categorie'),
+            'montant': exp_amount,
+            'score': round(final_score, 3)
+        })
+
+    suggestions.sort(key=lambda item: item['score'], reverse=True)
+    return suggestions[:limit]
+
+
+def _apply_recurrence_change(
+    data: Dict[str, Any],
+    target_type: str,
+    categorie: Optional[str] = None,
+    target_expense_id: Optional[int] = None
+) -> bool:
     """Applique une modification Variable/Récurrente dans depenses_recurrentes."""
     label = data.get('libelle') or ''
     pattern = _normalize_libelle_pattern(label)
@@ -227,7 +294,11 @@ def _apply_recurrence_change(data: Dict[str, Any], target_type: str, categorie: 
         return False
 
     expenses = finance_data.get('depenses_fixes', [])
-    matching_entry = _find_matching_expense(expenses, pattern)
+    matching_entry = None
+    if target_expense_id is not None:
+        matching_entry = _find_expense_by_id(expenses, target_expense_id)
+    if matching_entry is None:
+        matching_entry = _find_matching_expense(expenses, pattern)
 
     try:
         montant = abs(float(data.get('montant', 0) or 0))
@@ -248,16 +319,16 @@ def _apply_recurrence_change(data: Dict[str, Any], target_type: str, categorie: 
 
         if matching_entry and 'id' in matching_entry:
             labels = _ensure_label_list(matching_entry.get('libelle'))
-            labels_normalized = [_normalize_libelle_pattern(lbl) for lbl in labels]
-            if pattern not in labels_normalized:
-                labels.append(pattern)
-            if label and _normalize_libelle_pattern(label) not in labels_normalized:
-                labels.append(label)
+            updated_labels: List[str] = list(labels)
+            if label and all(label != existing for existing in updated_labels):
+                updated_labels.append(label)
+            if pattern and all(pattern != existing for existing in updated_labels):
+                updated_labels.append(pattern)
             updated_entry = dict(matching_entry)
-            if len(labels) == 1:
-                updated_entry['libelle'] = labels[0]
+            if len(updated_labels) == 1:
+                updated_entry['libelle'] = updated_labels[0]
             else:
-                updated_entry['libelle'] = labels
+                updated_entry['libelle'] = updated_labels
             if compte:
                 updated_entry['compte'] = compte
             if categorie:
@@ -1320,6 +1391,20 @@ def _load_latest_variable_transactions() -> Dict[str, Any]:
     }
 
 
+@router.get("/api/classification/recurrence-suggestions")
+async def api_get_recurrence_suggestions(
+    libelle: str,
+    montant: Optional[float] = None,
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Retourne des propositions de mapping vers des dépenses récurrentes existantes."""
+    suggestions = _suggest_recurring_candidates(libelle, montant or 0.0)
+    return JSONResponse(content={
+        'success': True,
+        'suggestions': suggestions
+    })
+
+
 @router.get("/api/classification/categories")
 async def api_get_classification_categories(
     authenticated: bool = Depends(verify_admin_auth)
@@ -1410,6 +1495,13 @@ async def api_post_classification_feedback(
     except (TypeError, ValueError):
         montant = 0.0
 
+    recurrence_target_id = None
+    if data.get('recurrence_target_id') not in (None, '', 'null'):
+        try:
+            recurrence_target_id = int(data.get('recurrence_target_id'))
+        except (ValueError, TypeError):
+            recurrence_target_id = None
+
     feedback_payload = {
         'transaction_id': data.get('transaction_id'),
         'libelle': data.get('libelle', ''),
@@ -1423,6 +1515,7 @@ async def api_post_classification_feedback(
         'confiance': data.get('ml_confidence'),
         'type_initial': type_initial,
         'type_corrige': type_corrige if (statut == 'corrige' and type_corrige) else type_initial,
+        'recurrence_target_id': recurrence_target_id,
     }
 
     feedback_id = feedback_manager.add_feedback(feedback_payload)
@@ -1454,7 +1547,8 @@ async def api_post_classification_feedback(
                 'categorie_corrigee': feedback_payload['categorie_corrigee']
             },
             effective_type_corrige,
-            feedback_payload['categorie_corrigee']
+            feedback_payload['categorie_corrigee'],
+            target_expense_id=recurrence_target_id
         )
 
     return JSONResponse(content={

@@ -76,6 +76,19 @@ EXCEPTIONS_VARIABLES = [
 ]
 
 
+def _simplify_label(value: str) -> str:
+    """Normalise un libellé pour faciliter les correspondances."""
+    if not value:
+        return ''
+    simplified = value.upper()
+    simplified = re.sub(r'\d{1,2}/\d{4}', ' ', simplified)
+    simplified = re.sub(r'\d{2}/\d{2}/\d{4}', ' ', simplified)
+    simplified = re.sub(r'\d{4}', ' ', simplified)
+    simplified = re.sub(r'\d+', ' ', simplified)
+    simplified = re.sub(r'\s+', ' ', simplified)
+    return simplified.strip()
+
+
 def doit_exclure_transaction(libelle, categorie="", notes="", montant=0.0):
     """
     Vérifie si une transaction doit être exclue de l'analyse
@@ -146,6 +159,7 @@ def est_depense_recurrente(transaction, depenses_fixes):
     """
     libelle = transaction.get('libelle_complet', transaction.get('libelle', ''))
     libelle_upper = libelle.upper()
+    libelle_simplifie = _simplify_label(libelle)
 
     # Vérifier d'abord les exceptions (dépenses qui doivent rester variables)
     for exception in EXCEPTIONS_VARIABLES:
@@ -177,9 +191,15 @@ def est_depense_recurrente(transaction, depenses_fixes):
         # Essayer chaque pattern de libellé
         for pattern_libelle_str in patterns_libelle:
             pattern_libelle = pattern_libelle_str.upper()
+            pattern_simplifie = _simplify_label(pattern_libelle_str)
 
-            # Si le pattern est présent dans le libellé de la transaction
+            match_label = False
             if pattern_libelle and pattern_libelle in libelle_upper:
+                match_label = True
+            elif pattern_simplifie and pattern_simplifie and pattern_simplifie in libelle_simplifie:
+                match_label = True
+
+            if match_label:
                 # L'identifiant n'est plus utilisé pour le matching, seulement pour l'affichage
                 # Vérifier le montant si un montant de référence est défini
                 if montant_reference > 0:
@@ -332,6 +352,7 @@ def analyser_transactions(transactions, use_ml=True, enable_learning=True, enabl
 
     depenses_fixes = []
     depenses_variables = []
+    depenses_hors_budget = []
 
     total_fixes = 0
     total_variables = 0
@@ -356,6 +377,13 @@ def analyser_transactions(transactions, use_ml=True, enable_learning=True, enabl
 
         # Ignorer les revenus (montants positifs)
         if montant >= 0:
+            continue
+
+        categorie_lower = (transaction.get('categorie') or '').lower()
+        notes_lower = (transaction.get('notes') or '').lower()
+        if 'hors budget' in categorie_lower or 'hors budget' in notes_lower:
+            transaction['hors_budget'] = True
+            depenses_hors_budget.append(transaction)
             continue
 
         # Améliorer la catégorie avec le classificateur ML si disponible
@@ -443,6 +471,7 @@ def analyser_transactions(transactions, use_ml=True, enable_learning=True, enabl
     return {
         'depenses_fixes': depenses_fixes,
         'depenses_variables': depenses_variables,
+        'depenses_hors_budget': depenses_hors_budget,
         'total_fixes': total_fixes,
         'total_variables': total_variables,
         'total': total_fixes + total_variables,
