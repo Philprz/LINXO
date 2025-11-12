@@ -9,6 +9,7 @@ import hashlib
 import os
 import platform
 import psutil
+import re
 import subprocess
 from pathlib import Path
 from datetime import datetime, date
@@ -30,6 +31,20 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 BASE_DIR = Path(__file__).parent.parent.parent.parent
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+CATEGORY_FALLBACKS = [
+    "Non classé",
+    "Hors budget",
+    "Autres",
+    "Alimentation",
+    "Transport",
+    "Logement",
+    "Assurances",
+    "Loisirs",
+    "Santé",
+    "Epargne",
+    "Frais bancaires",
+]
 
 # Répertoires importants
 DATA_DIR = BASE_DIR / "data"
@@ -150,6 +165,133 @@ def _active_adjustments(adjustments: List[Dict[str, Any]]) -> float:
         if start <= today <= end:
             total += montant
     return total
+
+
+def _collect_known_categories() -> List[str]:
+    """Compile la liste des catégories disponibles."""
+    categories = set(CATEGORY_FALLBACKS)
+    try:
+        finance_data = config_manager.get_expenses()
+        for key in ('depenses_fixes', 'revenus'):
+            for item in finance_data.get(key, []):
+                cat = str(item.get('categorie', '')).strip()
+                if cat:
+                    categories.add(cat)
+    except Exception:
+        pass
+    return sorted(categories)
+
+
+def _normalize_libelle_pattern(label: str) -> str:
+    """Simplifie un libellé pour le matching (supprime dates/chiffres)."""
+    if not label:
+        return ''
+    normalized = label.upper()
+    normalized = re.sub(r'\d{1,2}/\d{4}', ' ', normalized)
+    normalized = re.sub(r'\d{1,2}-\d{1,2}-\d{4}', ' ', normalized)
+    normalized = re.sub(r'\d{2}/\d{2}/\d{4}', ' ', normalized)
+    normalized = re.sub(r'\d+', ' ', normalized)
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+    return normalized or label.upper().strip()
+
+
+def _ensure_label_list(value: Any) -> List[str]:
+    """Convertit le champ libellé en liste uniforme."""
+    if isinstance(value, list):
+        return [v for v in value if v]
+    if value:
+        return [value]
+    return []
+
+
+def _find_matching_expense(expenses: List[Dict[str, Any]], pattern: str) -> Optional[Dict[str, Any]]:
+    """Recherche une dépense récurrente correspondant au motif."""
+    for expense in expenses:
+        labels = _ensure_label_list(expense.get('libelle'))
+        normalized_list = [_normalize_libelle_pattern(lbl) for lbl in labels if lbl]
+        if pattern in normalized_list:
+            return expense
+    return None
+
+
+def _apply_recurrence_change(data: Dict[str, Any], target_type: str, categorie: Optional[str] = None) -> bool:
+    """Applique une modification Variable/Récurrente dans depenses_recurrentes."""
+    label = data.get('libelle') or ''
+    pattern = _normalize_libelle_pattern(label)
+    if not pattern:
+        return False
+
+    try:
+        finance_data = config_manager.get_expenses()
+    except Exception:
+        return False
+
+    expenses = finance_data.get('depenses_fixes', [])
+    matching_entry = _find_matching_expense(expenses, pattern)
+
+    try:
+        montant = abs(float(data.get('montant', 0) or 0))
+    except (TypeError, ValueError):
+        montant = 0.0
+
+    categorie = (categorie or data.get('categorie_corrigee') or
+                 data.get('categorie_initiale') or 'Non classé')
+    compte = data.get('compte') or ''
+    identifiant = (label or pattern)[:40]
+
+    if target_type == 'recurrente':
+        labels_to_store = []
+        if label:
+            labels_to_store.append(label)
+        if pattern not in [_normalize_libelle_pattern(lbl) for lbl in labels_to_store]:
+            labels_to_store.append(pattern)
+
+        if matching_entry and 'id' in matching_entry:
+            labels = _ensure_label_list(matching_entry.get('libelle'))
+            labels_normalized = [_normalize_libelle_pattern(lbl) for lbl in labels]
+            if pattern not in labels_normalized:
+                labels.append(pattern)
+            if label and _normalize_libelle_pattern(label) not in labels_normalized:
+                labels.append(label)
+            updated_entry = dict(matching_entry)
+            if len(labels) == 1:
+                updated_entry['libelle'] = labels[0]
+            else:
+                updated_entry['libelle'] = labels
+            if compte:
+                updated_entry['compte'] = compte
+            if categorie:
+                updated_entry['categorie'] = categorie
+            if montant:
+                updated_entry['montant'] = montant
+            return config_manager.update_expense(matching_entry['id'], updated_entry)
+
+        new_entry = {
+            'libelle': labels_to_store if len(labels_to_store) > 1 else labels_to_store[0],
+            'identifiant': identifiant,
+            'compte': compte,
+            'categorie': categorie,
+            'montant': montant,
+            'commentaire': "Ajouté depuis l'interface classification",
+            'montant_tolerance': 0.1,
+            'periodicite': 'mensuel',
+            'mois_occurrence': list(range(1, 13))
+        }
+        return config_manager.add_expense(new_entry)
+
+    if matching_entry and 'id' in matching_entry:
+        labels = _ensure_label_list(matching_entry.get('libelle'))
+        remaining = [lbl for lbl in labels if _normalize_libelle_pattern(lbl) != pattern]
+        if not remaining:
+            return config_manager.delete_expense(matching_entry['id'])
+        updated_entry = dict(matching_entry)
+        if len(remaining) == 1:
+            updated_entry['libelle'] = remaining[0]
+        else:
+            updated_entry['libelle'] = remaining
+        return config_manager.update_expense(matching_entry['id'], updated_entry)
+
+    return False
 
 
 def _compute_budget_preview(finance_data: Dict[str, Any]) -> Dict[str, float]:
@@ -1178,6 +1320,18 @@ def _load_latest_variable_transactions() -> Dict[str, Any]:
     }
 
 
+@router.get("/api/classification/categories")
+async def api_get_classification_categories(
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """Retourne la liste des catégories connues."""
+    categories = _collect_known_categories()
+    return JSONResponse(content={
+        'success': True,
+        'categories': categories
+    })
+
+
 @router.get("/api/classification/transactions")
 async def api_get_classification_transactions(
     limit: int = 100,
@@ -1231,6 +1385,20 @@ async def api_post_classification_feedback(
             content={'success': False, 'error': 'transaction_id requis'}
         )
 
+    type_initial = str(data.get('type_initial', '')).lower() or None
+    type_corrige = str(data.get('type_corrige', '')).lower() or type_initial
+
+    if type_initial is None:
+        type_initial = 'variable'
+        type_corrige = type_corrige or type_initial
+
+    valid_types = {'variable', 'recurrente', None}
+    if type_initial not in valid_types or type_corrige not in valid_types:
+        return JSONResponse(
+            status_code=400,
+            content={'success': False, 'error': 'Type de dépense invalide'}
+        )
+
     if statut == 'corrige' and not data.get('categorie_corrigee'):
         return JSONResponse(
             status_code=400,
@@ -1253,6 +1421,8 @@ async def api_post_classification_feedback(
         'compte': data.get('compte'),
         'date_transaction': data.get('date_transaction', data.get('date')),
         'confiance': data.get('ml_confidence'),
+        'type_initial': type_initial,
+        'type_corrige': type_corrige if (statut == 'corrige' and type_corrige) else type_initial,
     }
 
     feedback_id = feedback_manager.add_feedback(feedback_payload)
@@ -1274,10 +1444,24 @@ async def api_post_classification_feedback(
         except Exception:
             ml_updated = False
 
+    recurrence_updated = False
+    effective_type_corrige = feedback_payload['type_corrige']
+    effective_type_initial = type_initial
+    if effective_type_corrige and effective_type_corrige != effective_type_initial:
+        recurrence_updated = _apply_recurrence_change(
+            {
+                **data,
+                'categorie_corrigee': feedback_payload['categorie_corrigee']
+            },
+            effective_type_corrige,
+            feedback_payload['categorie_corrigee']
+        )
+
     return JSONResponse(content={
         'success': True,
         'feedback_id': feedback_id,
-        'ml_updated': ml_updated
+        'ml_updated': ml_updated,
+        'recurrence_updated': recurrence_updated
     })
 
 

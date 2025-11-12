@@ -114,15 +114,26 @@
     }
 
     .form-input,
-    .form-textarea {
+    .form-textarea,
+    .form-select {
         padding: 0.5rem 0.75rem;
         border: 1px solid #d1d5db;
         border-radius: 6px;
         font-size: 0.9rem;
     }
 
+    .form-select {
+        background: #fff;
+    }
+
     .form-textarea {
         resize: vertical;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
     }
 </style>
 {% endblock %}
@@ -196,7 +207,16 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Nouvelle catégorie</label>
-                <input type="text" class="form-input" id="correction-categorie-nouvelle" placeholder="Ex: Alimentation">
+                <select class="form-select" id="correction-categorie-nouvelle"></select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Type de dépense</label>
+                <select class="form-select" id="correction-type">
+                    <option value="variable">Variable</option>
+                    <option value="recurrente">Récurrente</option>
+                </select>
             </div>
         </div>
         <div class="form-group">
@@ -216,6 +236,7 @@
 <script>
     let transactionsCache = [];
     let currentTransactionId = null;
+    let categoriesCache = [];
 
     const currencyFormatter = new Intl.NumberFormat('fr-FR', {
         style: 'currency',
@@ -317,14 +338,47 @@
         }
     }
 
+    function populateCategorySelect(selectedValue) {
+        const select = document.getElementById('correction-categorie-nouvelle');
+        if (!select) return;
+        const options = categoriesCache.length ? categoriesCache : [];
+        const uniqueOptions = new Set(options);
+        if (selectedValue) {
+            uniqueOptions.add(selectedValue);
+        }
+        select.innerHTML = Array.from(uniqueOptions)
+            .sort()
+            .map(cat => `<option value="${cat}">${cat}</option>`)
+            .join('');
+        if (selectedValue) {
+            select.value = selectedValue;
+        }
+    }
+
+    async function loadCategories() {
+        try {
+            const response = await fetch('/admin/api/classification/categories');
+            const data = await response.json();
+            if (data.success) {
+                categoriesCache = data.categories || [];
+            }
+        } catch (error) {
+            console.error('Erreur chargement categories:', error);
+        }
+    }
+
     function openCorrectionModal(id) {
         const tx = transactionsCache.find(t => t.id === id);
         if (!tx) return;
         currentTransactionId = id;
         document.getElementById('correction-libelle').value = tx.libelle || '';
         document.getElementById('correction-categorie-actuelle').value = tx.categorie || '';
-        document.getElementById('correction-categorie-nouvelle').value = '';
+        populateCategorySelect(tx.categorie || 'Non classé');
         document.getElementById('correction-commentaire').value = '';
+        const typeSelect = document.getElementById('correction-type');
+        if (typeSelect) {
+            typeSelect.value = tx.depense_recurrente ? 'recurrente' : 'variable';
+        }
         document.getElementById('correction-modal').classList.add('show');
     }
 
@@ -338,6 +392,7 @@
 
         const nouvelleCategorie = document.getElementById('correction-categorie-nouvelle').value.trim();
         const commentaire = document.getElementById('correction-commentaire').value.trim();
+        const nouveauType = document.getElementById('correction-type').value;
 
         if (!nouvelleCategorie) {
             showNotification('Merci de proposer une nouvelle catégorie', 'error');
@@ -358,7 +413,9 @@
                     montant: tx.montant,
                     compte: tx.compte,
                     date_transaction: tx.date,
-                    ml_confidence: tx.ml_confidence
+                    ml_confidence: tx.ml_confidence,
+                    type_initial: tx.depense_recurrente ? 'recurrente' : 'variable',
+                    type_corrige: nouveauType
                 })
             });
             const result = await response.json();
@@ -391,7 +448,14 @@
                 <div class="history-item">
                     <div>
                         <strong>${item.libelle}</strong><br>
-                        <small>${item.categorie_initiale || 'Non classé'} → ${item.categorie_corrigee}</small>
+                         <small>
+                            ${(item.categorie_initiale || 'Non classé')} → ${(item.categorie_corrigee || 'Non classé')}
+                            ${
+                                (item.type_initial && item.type_corrige && item.type_initial !== item.type_corrige)
+                                    ? ` · ${(item.type_initial === 'recurrente' ? 'Fixe' : 'Variable')} → ${(item.type_corrige === 'recurrente' ? 'Fixe' : 'Variable')}`
+                                    : ''
+                            }
+                         </small>
                     </div>
                     <div style="text-align:right;">
                         <div>${formatCurrency(item.montant)}</div>
@@ -404,7 +468,9 @@
         }
     }
 
-    loadTransactions();
-    loadHistory();
+    loadCategories().then(() => {
+        loadTransactions();
+        loadHistory();
+    });
 </script>
 {% endblock %}

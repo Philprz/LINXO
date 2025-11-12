@@ -42,6 +42,8 @@ class FeedbackManager:
                     compte TEXT,
                     date_transaction TEXT,
                     confiance REAL,
+                    type_initial TEXT,
+                    type_corrige TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -49,6 +51,16 @@ class FeedbackManager:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_feedback_tx ON feedback(transaction_id)"
             )
+
+            # Ajout de colonnes pour compatibilité ascendante
+            try:
+                conn.execute("ALTER TABLE feedback ADD COLUMN type_initial TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE feedback ADD COLUMN type_corrige TEXT")
+            except sqlite3.OperationalError:
+                pass
 
     # ------------------------------------------------------------------ #
     # Public API                                                         #
@@ -70,9 +82,11 @@ class FeedbackManager:
                     compte,
                     date_transaction,
                     confiance,
+                    type_initial,
+                    type_corrige,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     feedback.get("transaction_id"),
@@ -85,6 +99,8 @@ class FeedbackManager:
                     feedback.get("compte"),
                     feedback.get("date_transaction"),
                     feedback.get("confiance"),
+                    feedback.get("type_initial"),
+                    feedback.get("type_corrige"),
                     feedback.get("created_at", datetime.utcnow().isoformat()),
                 ),
             )
@@ -97,7 +113,9 @@ class FeedbackManager:
                 """
                 SELECT id, transaction_id, libelle, categorie_initiale,
                        categorie_corrigee, statut, commentaire, montant,
-                       compte, date_transaction, confiance, created_at
+                       compte, date_transaction, confiance,
+                       type_initial, type_corrige,
+                       created_at
                 FROM feedback
                 ORDER BY id DESC
                 LIMIT ?
