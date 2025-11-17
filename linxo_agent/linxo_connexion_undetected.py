@@ -36,6 +36,41 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from config import get_config  # type: ignore
 
+# CORRECTION GLOBALE : Monkey-patch de undetected_chromedriver au niveau du module
+# pour éviter l'erreur "Read-only file system" sur VPS avec ProtectHome=read-only
+_CHROMEDRIVER_CACHE_DIR = None
+_ORIGINAL_PATCHER_INIT = None
+
+
+def _setup_chromedriver_cache_redirect():
+    """Configure la redirection du cache chromedriver vers un dossier accessible"""
+    global _CHROMEDRIVER_CACHE_DIR, _ORIGINAL_PATCHER_INIT
+
+    # Ne faire le setup qu'une seule fois
+    if _ORIGINAL_PATCHER_INIT is not None:
+        return
+
+    import undetected_chromedriver.patcher as patcher_module
+
+    # Sauvegarder la méthode originale
+    _ORIGINAL_PATCHER_INIT = patcher_module.Patcher.__init__
+
+    def patched_init(self, *args, **kwargs):
+        """Patcher __init__ pour rediriger data_path"""
+        # Appeler l'init original
+        _ORIGINAL_PATCHER_INIT(self, *args, **kwargs)
+
+        # Rediriger data_path si le cache_dir est configuré
+        if _CHROMEDRIVER_CACHE_DIR:
+            self.data_path = str(_CHROMEDRIVER_CACHE_DIR)
+
+    # Remplacer __init__ au niveau du module
+    patcher_module.Patcher.__init__ = patched_init
+
+
+# Appliquer le monkey patch immédiatement
+_setup_chromedriver_cache_redirect()
+
 # Import du module 2FA
 try:
     from .linxo_2fa import recuperer_code_2fa_email
@@ -98,8 +133,10 @@ def initialiser_driver_linxo_undetected(
 
     # CORRECTION: Créer un dossier de cache pour chromedriver dans le projet
     # pour éviter l'erreur "Read-only file system" sur VPS
+    global _CHROMEDRIVER_CACHE_DIR
     chromedriver_cache_dir = config.base_dir / '.chromedriver_cache'
     chromedriver_cache_dir.mkdir(parents=True, exist_ok=True)
+    _CHROMEDRIVER_CACHE_DIR = chromedriver_cache_dir
     print(f"[INFO] Dossier de cache chromedriver: {chromedriver_cache_dir}")
 
     # ÉTAPE 1: Cleanup préventif (si activé)
@@ -155,42 +192,16 @@ def initialiser_driver_linxo_undetected(
             }
             options.add_experimental_option("prefs", prefs)
 
-            # CORRECTION CRITIQUE : Rediriger le dossier de cache de undetected_chromedriver
-            # pour éviter l'erreur "Read-only file system" sur VPS
-            # On doit monkey-patcher la classe Patcher AVANT la création du driver
-            print("[INFO] Configuration du cache chromedriver personnalisé...")
-
-            import undetected_chromedriver.patcher as patcher_module
-
-            # Sauvegarder la méthode originale __init__
-            original_patcher_init = patcher_module.Patcher.__init__
-
-            def patched_init(self, *args, **kwargs):
-                # Appeler l'init original
-                original_patcher_init(self, *args, **kwargs)
-
-                # Rediriger uniquement data_path vers notre dossier personnalisé
-                self.data_path = str(chromedriver_cache_dir)
-                print(f"[DEBUG] Patcher data_path redirigé vers: {self.data_path}")
-
-            # Remplacer temporairement __init__
-            patcher_module.Patcher.__init__ = patched_init
-
-            try:
-                # Création du driver avec undetected-chromedriver
-                # Le patcher utilisera maintenant notre dossier personnalisé
-                print("[INFO] Création du driver avec cache personnalisé...")
-                driver = uc.Chrome(
-                    options=options,
-                    headless=is_server,
-                    use_subprocess=True,
-                    version_main=None  # Auto-detect Chrome version
-                )
-                print("[OK] Driver créé avec succès!")
-
-            finally:
-                # Restaurer la méthode originale pour ne pas affecter d'autres instances
-                patcher_module.Patcher.__init__ = original_patcher_init
+            # Création du driver avec undetected-chromedriver
+            # Le monkey patch au niveau du module redirige automatiquement le cache
+            print("[INFO] Création du driver avec cache personnalisé...")
+            driver = uc.Chrome(
+                options=options,
+                headless=is_server,
+                use_subprocess=True,
+                version_main=None  # Auto-detect Chrome version
+            )
+            print("[OK] Driver créé avec succès!")
 
             # Configuration du timeout
             wait = WebDriverWait(driver, 30)
