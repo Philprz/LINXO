@@ -644,48 +644,96 @@ async def api_restart_app(
     try:
         # Déterminer la commande de redémarrage selon l'environnement
         if platform.system() == 'Linux':
-            # Sur VPS/Linux, on utilise systemctl pour redémarrer le service
-            # On cherche d'abord le nom du service
-            service_name = 'linxo-report-server'
+            # Créer un fichier de flag pour déclencher le redémarrage
+            # Le service systemd ou un script externe peut surveiller ce fichier
+            restart_flag = BASE_DIR / '.restart_flag'
 
-            # Essayer de redémarrer le service systemd
-            result = subprocess.run(
-                ['sudo', 'systemctl', 'restart', service_name],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            try:
+                restart_flag.touch()
 
-            if result.returncode == 0:
+                # Méthode 1: Auto-redémarrage via os.execv (redémarre le processus Python)
+                import signal
+                import os
+
+                # Envoyer un signal SIGHUP au processus courant
+                # Cela déclenchera un redémarrage si le service est configuré pour ça
+                pid = os.getpid()
+
+                # Créer un script de redémarrage qui sera exécuté
+                restart_script = BASE_DIR / 'restart_app.sh'
+                with open(restart_script, 'w') as f:
+                    f.write(f"""#!/bin/bash
+# Script de redémarrage automatique
+sleep 2
+kill -HUP {pid}
+""")
+                os.chmod(restart_script, 0o755)
+
+                # Lancer le script en arrière-plan
+                subprocess.Popen(
+                    ['/bin/bash', str(restart_script)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+
                 return JSONResponse(content={
                     'success': True,
-                    'message': f'Service {service_name} redémarré avec succès',
-                    'output': result.stdout
+                    'message': 'Redémarrage programmé dans 2 secondes...',
+                    'method': 'auto-restart'
                 })
-            else:
-                # Si systemctl échoue, essayer avec supervisorctl si disponible
+
+            except Exception as e:
+                # Si l'auto-redémarrage échoue, essayer systemctl sans sudo
+                # en supposant que l'utilisateur a les droits
+                methods_tried = []
+
+                # Méthode 2: systemctl --user (si le service tourne en mode utilisateur)
                 result = subprocess.run(
-                    ['sudo', 'supervisorctl', 'restart', 'linxo-report-server'],
+                    ['systemctl', '--user', 'restart', 'linxo-report-server'],
                     capture_output=True,
                     text=True,
-                    timeout=10
+                    timeout=5
                 )
+                methods_tried.append(('systemctl --user', result.returncode, result.stderr))
 
                 if result.returncode == 0:
                     return JSONResponse(content={
                         'success': True,
-                        'message': 'Application redémarrée via supervisor',
+                        'message': 'Application redémarrée (systemctl --user)',
                         'output': result.stdout
                     })
-                else:
-                    return JSONResponse(
-                        status_code=500,
-                        content={
-                            'success': False,
-                            'error': 'Impossible de redémarrer le service',
-                            'details': result.stderr
-                        }
-                    )
+
+                # Méthode 3: systemd-run pour créer un service temporaire
+                result = subprocess.run(
+                    ['systemd-run', '--user', '--', 'systemctl', '--user', 'restart', 'linxo-report-server'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                methods_tried.append(('systemd-run', result.returncode, result.stderr))
+
+                if result.returncode == 0:
+                    return JSONResponse(content={
+                        'success': True,
+                        'message': 'Application redémarrée (systemd-run)',
+                        'output': result.stdout
+                    })
+
+                # Toutes les méthodes ont échoué
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        'success': False,
+                        'error': 'Toutes les méthodes de redémarrage ont échoué',
+                        'details': f'Flag créé: {restart_flag.exists()}',
+                        'methods_tried': [
+                            f"{m[0]}: returncode={m[1]}, stderr={m[2][:100]}"
+                            for m in methods_tried
+                        ],
+                        'suggestion': 'Configurez sudo avec: sudo visudo -f /etc/sudoers.d/linxo-restart'
+                    }
+                )
         else:
             # Sur Windows/développement, on ne peut pas vraiment redémarrer
             return JSONResponse(
@@ -710,7 +758,8 @@ async def api_restart_app(
             status_code=500,
             content={
                 'success': False,
-                'error': f'Erreur lors du redémarrage: {str(e)}'
+                'error': f'Erreur lors du redémarrage: {str(e)}',
+                'type': type(e).__name__
             }
         )
 
