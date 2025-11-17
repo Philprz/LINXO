@@ -206,6 +206,9 @@
         <button class="action-btn btn-primary" onclick="executeAction('test-sms')" id="btn-test-sms">
             📱 Test SMS
         </button>
+        <button class="action-btn btn-warning" onclick="restartApp()" id="btn-restart-app" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white;">
+            🔄 Redémarrer l'application
+        </button>
     </div>
 
     <div id="action-result" style="margin-top: 1.5rem;"></div>
@@ -375,6 +378,46 @@
             }
         } catch (error) {
             showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function restartApp() {
+        if (!confirm('⚠️ ATTENTION: Redémarrer l\'application interrompra toutes les connexions en cours.\n\nVoulez-vous vraiment redémarrer l\'application ?')) {
+            return;
+        }
+
+        const resultDiv = document.getElementById('action-result');
+        resultDiv.innerHTML = `<div class="alert alert-warning">⏳ Redémarrage de l'application en cours...</div>`;
+
+        // Désactiver le bouton
+        document.getElementById('btn-restart-app').disabled = true;
+
+        try {
+            const response = await fetch('/admin/api/restart-app', {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                resultDiv.innerHTML = `<div class="alert alert-success">✅ ${result.message}<br><small>Reconnexion dans 5 secondes...</small></div>`;
+
+                // Attendre 5 secondes puis recharger la page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 5000);
+            } else {
+                resultDiv.innerHTML = `<div class="alert alert-error">❌ Erreur: ${result.error || 'Échec du redémarrage'}<br><small>${result.details || ''}</small></div>`;
+                document.getElementById('btn-restart-app').disabled = false;
+            }
+
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="alert alert-error">❌ Erreur: ${error.message}<br><small>L'application a peut-être redémarré. Rechargez la page manuellement.</small></div>`;
+
+            // L'erreur peut être normale si le serveur a redémarré
+            // Essayer de recharger après quelques secondes
+            setTimeout(() => {
+                window.location.reload();
+            }, 5000);
         }
     }
 

@@ -628,6 +628,93 @@ async def api_cleanup_chrome(
     })
 
 
+@router.post("/api/restart-app")
+async def api_restart_app(
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """
+    Redémarre l'application Linxo Report Server
+
+    Args:
+        authenticated: Dépendance d'authentification
+
+    Returns:
+        JSONResponse: Résultat de l'opération
+    """
+    try:
+        # Déterminer la commande de redémarrage selon l'environnement
+        if platform.system() == 'Linux':
+            # Sur VPS/Linux, on utilise systemctl pour redémarrer le service
+            # On cherche d'abord le nom du service
+            service_name = 'linxo-report-server'
+
+            # Essayer de redémarrer le service systemd
+            result = subprocess.run(
+                ['sudo', 'systemctl', 'restart', service_name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode == 0:
+                return JSONResponse(content={
+                    'success': True,
+                    'message': f'Service {service_name} redémarré avec succès',
+                    'output': result.stdout
+                })
+            else:
+                # Si systemctl échoue, essayer avec supervisorctl si disponible
+                result = subprocess.run(
+                    ['sudo', 'supervisorctl', 'restart', 'linxo-report-server'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+
+                if result.returncode == 0:
+                    return JSONResponse(content={
+                        'success': True,
+                        'message': 'Application redémarrée via supervisor',
+                        'output': result.stdout
+                    })
+                else:
+                    return JSONResponse(
+                        status_code=500,
+                        content={
+                            'success': False,
+                            'error': 'Impossible de redémarrer le service',
+                            'details': result.stderr
+                        }
+                    )
+        else:
+            # Sur Windows/développement, on ne peut pas vraiment redémarrer
+            return JSONResponse(
+                status_code=400,
+                content={
+                    'success': False,
+                    'error': 'Redémarrage non supporté en développement',
+                    'message': 'Veuillez redémarrer manuellement le serveur'
+                }
+            )
+
+    except subprocess.TimeoutExpired:
+        return JSONResponse(
+            status_code=500,
+            content={
+                'success': False,
+                'error': 'Timeout lors du redémarrage'
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                'success': False,
+                'error': f'Erreur lors du redémarrage: {str(e)}'
+            }
+        )
+
+
 @router.get("/logs", response_class=HTMLResponse)
 async def admin_logs(
     request: Request,
