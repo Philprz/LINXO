@@ -688,9 +688,26 @@ kill -HUP {pid}
                 # en supposant que l'utilisateur a les droits
                 methods_tried = []
 
-                # Méthode 2: systemctl --user (si le service tourne en mode utilisateur)
+                # Méthode 2: Tenter sudo systemctl (nécessite sudoers configuré)
+                for service_name in ['linxo-admin', 'linxo-report-server']:
+                    result = subprocess.run(
+                        ['sudo', '-n', 'systemctl', 'restart', service_name],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    methods_tried.append((f'sudo systemctl restart {service_name}', result.returncode, result.stderr))
+
+                    if result.returncode == 0:
+                        return JSONResponse(content={
+                            'success': True,
+                            'message': f'Application redémarrée ({service_name})',
+                            'output': result.stdout
+                        })
+
+                # Méthode 3: systemctl --user (si le service tourne en mode utilisateur)
                 result = subprocess.run(
-                    ['systemctl', '--user', 'restart', 'linxo-report-server'],
+                    ['systemctl', '--user', 'restart', 'linxo-admin'],
                     capture_output=True,
                     text=True,
                     timeout=5
@@ -701,22 +718,6 @@ kill -HUP {pid}
                     return JSONResponse(content={
                         'success': True,
                         'message': 'Application redémarrée (systemctl --user)',
-                        'output': result.stdout
-                    })
-
-                # Méthode 3: systemd-run pour créer un service temporaire
-                result = subprocess.run(
-                    ['systemd-run', '--user', '--', 'systemctl', '--user', 'restart', 'linxo-report-server'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                methods_tried.append(('systemd-run', result.returncode, result.stderr))
-
-                if result.returncode == 0:
-                    return JSONResponse(content={
-                        'success': True,
-                        'message': 'Application redémarrée (systemd-run)',
                         'output': result.stdout
                     })
 
@@ -731,7 +732,7 @@ kill -HUP {pid}
                             f"{m[0]}: returncode={m[1]}, stderr={m[2][:100]}"
                             for m in methods_tried
                         ],
-                        'suggestion': 'Configurez sudo avec: sudo visudo -f /etc/sudoers.d/linxo-restart'
+                        'suggestion': 'Configurez sudo: sudo visudo -f /etc/sudoers.d/linxo-restart puis ajoutez: linxo ALL=(ALL) NOPASSWD: /bin/systemctl restart linxo-admin'
                     }
                 )
         else:
