@@ -102,11 +102,6 @@ def initialiser_driver_linxo_undetected(
     chromedriver_cache_dir.mkdir(parents=True, exist_ok=True)
     print(f"[INFO] Dossier de cache chromedriver: {chromedriver_cache_dir}")
 
-    # CORRECTION CRITIQUE: Définir la variable d'environnement HOME pour undetected_chromedriver
-    # Cela force le patcher à utiliser notre dossier au lieu de ~/.local/share
-    os.environ['UC_DATA_PATH'] = str(chromedriver_cache_dir)
-    print(f"[DEBUG] Variable UC_DATA_PATH définie: {os.environ['UC_DATA_PATH']}")
-
     # ÉTAPE 1: Cleanup préventif (si activé)
     if cleanup:
         print("\n[CLEANUP] Nettoyage preventif...")
@@ -173,20 +168,10 @@ def initialiser_driver_linxo_undetected(
             def patched_init(self, *args, **kwargs):
                 # Appeler l'init original
                 original_patcher_init(self, *args, **kwargs)
-                # Rediriger TOUS les chemins vers notre dossier personnalisé
+
+                # Rediriger uniquement data_path vers notre dossier personnalisé
                 self.data_path = str(chromedriver_cache_dir)
-
-                # CORRECTION CRITIQUE : Rediriger également executable_path
-                # C'est ce chemin qui cause l'erreur "Read-only file system"
-                if hasattr(self, 'executable_path') and self.executable_path:
-                    # Extraire le nom du fichier
-                    from pathlib import Path as PathLib
-                    original_name = PathLib(self.executable_path).name
-                    # Créer le nouveau chemin dans notre cache
-                    self.executable_path = str(chromedriver_cache_dir / original_name)
-                    print(f"[DEBUG] executable_path redirigé vers: {self.executable_path}")
-
-                print(f"[DEBUG] data_path redirigé vers: {self.data_path}")
+                print(f"[DEBUG] Patcher data_path redirigé vers: {self.data_path}")
 
             # Remplacer temporairement __init__
             patcher_module.Patcher.__init__ = patched_init
@@ -199,8 +184,7 @@ def initialiser_driver_linxo_undetected(
                     options=options,
                     headless=is_server,
                     use_subprocess=True,
-                    version_main=None,  # Auto-detect Chrome version
-                    driver_executable_path=str(chromedriver_cache_dir)  # Forcer le répertoire
+                    version_main=None  # Auto-detect Chrome version
                 )
                 print("[OK] Driver créé avec succès!")
 
