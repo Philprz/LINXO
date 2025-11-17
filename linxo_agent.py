@@ -357,7 +357,9 @@ AUCUN rapport budget n'a été envoyé.
                     df,
                     report_date=None,  # Aujourd'hui par défaut
                     base_url=base_url,
-                    signing_key=signing_key
+                    signing_key=signing_key,
+                    budget_max=config.budget_variable,  # Pour page dépenses variables
+                    analysis_result=analysis_result  # Pour pages frais fixes et variables
                 )
 
                 print(f"[SUCCESS] Rapports HTML generes dans {report_index.base_dir}")
