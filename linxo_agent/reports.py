@@ -562,6 +562,41 @@ def build_daily_report(
     index_html = index_template.render(**index_context)
     (base_dir / "index.html").write_text(index_html, encoding="utf-8")
 
+    # Générer les pages dédiées aux frais fixes et dépenses variables
+    frais_fixes_url = None
+    depenses_variables_url = None
+
+    if analysis_result:
+        # Page frais fixes
+        try:
+            frais_fixes_url = build_frais_fixes_page(
+                base_dir=base_dir,
+                report_date_str=report_date_str,
+                base_url=base_url,
+                signing_key=signing_key,
+                analysis_result=analysis_result,
+                env=env,
+            )
+            print(f"[OK] Page frais fixes générée: {frais_fixes_url}")
+        except Exception as e:
+            print(f"[WARN] Erreur génération page frais fixes: {e}")
+
+        # Page dépenses variables
+        if budget_max:
+            try:
+                depenses_variables_url = build_depenses_variables_page(
+                    base_dir=base_dir,
+                    report_date_str=report_date_str,
+                    base_url=base_url,
+                    signing_key=signing_key,
+                    analysis_result=analysis_result,
+                    env=env,
+                    budget_max=budget_max,
+                )
+                print(f"[OK] Page dépenses variables générée: {depenses_variables_url}")
+            except Exception as e:
+                print(f"[WARN] Erreur génération page dépenses variables: {e}")
+
     return ReportIndex(
         report_date=report_date_str,
         base_dir=base_dir,
@@ -570,6 +605,211 @@ def build_daily_report(
         grand_total=grand_total,
         total_transactions=total_transactions,
     )
+
+
+def build_frais_fixes_page(
+    base_dir: Path,
+    report_date_str: str,
+    base_url: str,
+    signing_key: Optional[str],
+    analysis_result: Dict[str, Any],
+    env: Environment,
+) -> Optional[str]:
+    """
+    Génère la page dédiée aux frais fixes.
+    Retourne l'URL de la page générée.
+    """
+    from config import get_config
+    import calendar
+
+    config = get_config()
+    depenses_fixes_ref = config.depenses_data.get('depenses_fixes', [])
+    depenses_fixes_transactions = analysis_result.get('depenses_fixes', [])
+
+    # Obtenir le mois en cours
+    r_date = datetime.strptime(report_date_str, "%Y-%m-%d").date()
+    mois_actuel = r_date.month
+    jour_actuel = r_date.day
+
+    # Classer les frais fixes
+    preleves = []
+    en_attente = []
+    non_appliques = []
+
+    # Créer un ensemble des identifiants prélevés
+    identifiants_preleves = set()
+    for trans in depenses_fixes_transactions:
+        # Chercher la correspondance dans la config
+        for frais_ref in depenses_fixes_ref:
+            identifiant = frais_ref.get('identifiant', frais_ref.get('libelle', ''))
+            if identifiant.upper() in trans.get('libelle', '').upper():
+                identifiants_preleves.add(identifiant)
+                preleves.append({
+                    'date': trans.get('date_str', trans.get('date', '')),
+                    'libelle': trans.get('libelle', ''),
+                    'compte': trans.get('compte', ''),
+                    'montant': abs(trans.get('montant', 0.0)),
+                    'commentaire_config': frais_ref.get('commentaire', '')
+                })
+                break
+
+    # Analyser les frais de référence
+    for frais in depenses_fixes_ref:
+        identifiant = frais.get('identifiant', frais.get('libelle', ''))
+        mois_occurrence = frais.get('mois_occurrence', list(range(1, 13)))
+
+        # Vérifier si applicable ce mois
+        if mois_actuel in mois_occurrence:
+            # Vérifier si déjà prélevé
+            if identifiant not in identifiants_preleves:
+                en_attente.append(frais)
+        else:
+            non_appliques.append(frais)
+
+    # Calculs des totaux
+    total_preleve = sum(f['montant'] for f in preleves)
+    total_en_attente = sum(f.get('montant', 0.0) for f in en_attente)
+    total_prevu = total_preleve + total_en_attente
+    nb_preleves = len(preleves)
+    nb_total = len(preleves) + len(en_attente)
+
+    # URL de l'index
+    index_relative_url = f"/{report_date_str}/index.html"
+    index_url = f"{base_url.rstrip('/')}{index_relative_url}"
+    if signing_key:
+        token_idx = generate_token(index_relative_url, signing_key)
+        index_url = f"{index_url}?t={token_idx}"
+
+    # Générer la page
+    template = env.get_template("frais-fixes.html.j2")
+    context = {
+        "report_date": report_date_str,
+        "index_url": index_url,
+        "preleves": preleves,
+        "en_attente": en_attente,
+        "non_appliques": non_appliques,
+        "total_preleve": total_preleve,
+        "total_en_attente": total_en_attente,
+        "total_prevu": total_prevu,
+        "nb_preleves": nb_preleves,
+        "nb_total": nb_total,
+    }
+
+    html_content = template.render(**context)
+    file_path = base_dir / "frais-fixes.html"
+    file_path.write_text(html_content, encoding="utf-8")
+
+    # Retourner l'URL
+    relative_url = f"/{report_date_str}/frais-fixes.html"
+    full_url = f"{base_url.rstrip('/')}{relative_url}"
+    if signing_key:
+        token = generate_token(relative_url, signing_key)
+        full_url = f"{full_url}?t={token}"
+
+    return full_url
+
+
+def build_depenses_variables_page(
+    base_dir: Path,
+    report_date_str: str,
+    base_url: str,
+    signing_key: Optional[str],
+    analysis_result: Dict[str, Any],
+    env: Environment,
+    budget_max: float,
+) -> Optional[str]:
+    """
+    Génère la page dédiée aux dépenses variables avec filtrage par catégorie.
+    Retourne l'URL de la page générée.
+    """
+    import calendar
+
+    depenses_variables = analysis_result.get('depenses_variables', [])
+    total_variables = analysis_result.get('total_variables', 0.0)
+
+    # Obtenir le mois en cours
+    r_date = datetime.strptime(report_date_str, "%Y-%m-%d").date()
+    jour_actuel = r_date.day
+    dernier_jour = calendar.monthrange(r_date.year, r_date.month)[1]
+    avancement_mois = (jour_actuel / dernier_jour) * 100
+
+    # Calculs budgétaires
+    reste = budget_max - total_variables
+    pourcentage = (total_variables / budget_max * 100) if budget_max > 0 else 0
+
+    # Couleur de la barre
+    if reste < 0:
+        couleur_barre = "#dc3545"  # Rouge
+    elif pourcentage > avancement_mois + 10:
+        couleur_barre = "#fd7e14"  # Orange
+    else:
+        couleur_barre = "#28a745"  # Vert
+
+    # Préparer les transactions
+    transactions = []
+    categories_count = {}
+
+    for trans in depenses_variables:
+        categorie = trans.get('categorie', 'Non classé')
+        montant = abs(trans.get('montant', 0.0))
+
+        transactions.append({
+            'date': trans.get('date_str', trans.get('date', '')),
+            'libelle': trans.get('libelle', ''),
+            'categorie': categorie,
+            'compte': trans.get('compte', ''),
+            'montant': montant,
+        })
+
+        # Compter par catégorie
+        if categorie not in categories_count:
+            categories_count[categorie] = {'count': 0, 'total': 0.0}
+        categories_count[categorie]['count'] += 1
+        categories_count[categorie]['total'] += montant
+
+    # Préparer les catégories pour les filtres
+    categories = [
+        {'name': cat, 'count': data['count'], 'total': data['total']}
+        for cat, data in sorted(categories_count.items(), key=lambda x: x[1]['total'], reverse=True)
+    ]
+
+    # URL de l'index
+    index_relative_url = f"/{report_date_str}/index.html"
+    index_url = f"{base_url.rstrip('/')}{index_relative_url}"
+    if signing_key:
+        token_idx = generate_token(index_relative_url, signing_key)
+        index_url = f"{index_url}?t={token_idx}"
+
+    # Générer la page
+    template = env.get_template("depenses-variables.html.j2")
+    context = {
+        "report_date": report_date_str,
+        "index_url": index_url,
+        "transactions": transactions,
+        "categories": categories,
+        "total_variables": total_variables,
+        "budget_max": budget_max,
+        "reste": reste,
+        "pourcentage": pourcentage,
+        "couleur_barre": couleur_barre,
+        "avancement_mois": avancement_mois,
+        "jour_actuel": jour_actuel,
+        "dernier_jour": dernier_jour,
+        "nb_transactions": len(transactions),
+    }
+
+    html_content = template.render(**context)
+    file_path = base_dir / "depenses-variables.html"
+    file_path.write_text(html_content, encoding="utf-8")
+
+    # Retourner l'URL
+    relative_url = f"/{report_date_str}/depenses-variables.html"
+    full_url = f"{base_url.rstrip('/')}{relative_url}"
+    if signing_key:
+        token = generate_token(relative_url, signing_key)
+        full_url = f"{full_url}?t={token}"
+
+    return full_url
 
 
 if __name__ == "__main__":

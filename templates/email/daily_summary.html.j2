@@ -244,7 +244,7 @@
 
         <div class="content">
             <div class="metric">
-                <a href="{{ index_url }}" style="text-decoration: none; color: inherit; border-bottom: 1px dashed #007bff;">
+                <a href="{{ frais_fixes_url }}" style="text-decoration: none; color: inherit; border-bottom: 1px dashed #007bff;">
                     <span class="metric-label">Frais fixes 🔗</span>
                 </a>
                 <span class="metric-value value-red">{{ "%.2f"|format(total_fixes) }} €</span>
@@ -264,7 +264,7 @@
             </div>
 
             <div class="metric">
-                <a href="{{ index_url }}" style="text-decoration: none; color: inherit; border-bottom: 1px dashed #007bff;">
+                <a href="{{ depenses_variables_url }}" style="text-decoration: none; color: inherit; border-bottom: 1px dashed #007bff;">
                     <span class="metric-label">Dépenses variables 🔗</span>
                 </a>
                 <span class="metric-value value-red">{{ "%.2f"|format(total_variables) }} €</span>
@@ -342,6 +342,11 @@
 
         <div class="footer">
             🤖 Rapport généré automatiquement par votre Agent Linxo
+            <div style="margin-top: 10px;">
+                <a href="{{ admin_url }}" style="text-decoration: none; color: #666; font-size: 18px; opacity: 0.7; transition: opacity 0.2s;" title="Administration">
+                    ⚙️
+                </a>
+            </div>
         </div>
     </div>
 </body>

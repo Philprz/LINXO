@@ -553,17 +553,45 @@ class NotificationManager:
 
                 base_url = _os.getenv("REPORTS_BASE_URL") or "https://linxo.appliprz.ovh/reports"
                 index_url = "#"
+                frais_fixes_url = "#"
+                depenses_variables_url = "#"
+                admin_url = _os.getenv("ADMIN_URL") or "https://linxo.appliprz.ovh/admin"
+
                 if base_url:
                     report_date = getattr(report_index, "report_date", "")
+                    signing_key = _os.getenv("REPORTS_SIGNING_KEY")
+
+                    # URL index
                     index_relative = f"/{report_date}/index.html"
                     index_url = f"{base_url.rstrip('/')}{index_relative}"
-                    signing_key = _os.getenv("REPORTS_SIGNING_KEY")
                     if signing_key:
                         # token si présent
                         try:
                             from reports import generate_token  # type: ignore
                             token = generate_token(index_relative, signing_key)
                             index_url = f"{index_url}?t={token}"
+                        except Exception:  # pylint: disable=broad-except
+                            pass
+
+                    # URL frais fixes
+                    frais_fixes_relative = f"/{report_date}/frais-fixes.html"
+                    frais_fixes_url = f"{base_url.rstrip('/')}{frais_fixes_relative}"
+                    if signing_key:
+                        try:
+                            from reports import generate_token  # type: ignore
+                            token = generate_token(frais_fixes_relative, signing_key)
+                            frais_fixes_url = f"{frais_fixes_url}?t={token}"
+                        except Exception:  # pylint: disable=broad-except
+                            pass
+
+                    # URL dépenses variables
+                    depenses_variables_relative = f"/{report_date}/depenses-variables.html"
+                    depenses_variables_url = f"{base_url.rstrip('/')}{depenses_variables_relative}"
+                    if signing_key:
+                        try:
+                            from reports import generate_token  # type: ignore
+                            token = generate_token(depenses_variables_relative, signing_key)
+                            depenses_variables_url = f"{depenses_variables_url}?t={token}"
                         except Exception:  # pylint: disable=broad-except
                             pass
 
@@ -664,6 +692,9 @@ class NotificationManager:
                     families=getattr(report_index, "families", []),
                     grand_total=getattr(report_index, "grand_total", 0),
                     index_url=index_url,
+                    frais_fixes_url=frais_fixes_url,
+                    depenses_variables_url=depenses_variables_url,
+                    admin_url=admin_url,
                 )
             else:
                 # Formateur HTML si dispo
