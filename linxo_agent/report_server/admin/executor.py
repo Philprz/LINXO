@@ -96,12 +96,33 @@ class TaskExecutor:
         task.start_time = datetime.now()
 
         try:
+            # Préparer l'environnement : utiliser le venv si disponible
+            import os
+            env = os.environ.copy()
+
+            # Chercher le venv dans le projet
+            venv_paths = [
+                BASE_DIR / '.venv' / 'bin',  # Linux/Mac
+                BASE_DIR / 'venv' / 'bin',
+                BASE_DIR / '.venv' / 'Scripts',  # Windows
+                BASE_DIR / 'venv' / 'Scripts',
+            ]
+
+            for venv_path in venv_paths:
+                if venv_path.exists():
+                    # Ajouter le venv au PATH
+                    env['PATH'] = f"{venv_path}:{env.get('PATH', '')}"
+                    env['VIRTUAL_ENV'] = str(venv_path.parent)
+                    task.output.append(f"[INFO] Utilisation du venv: {venv_path}")
+                    break
+
             # Exécuter la commande
             process = await asyncio.create_subprocess_exec(
                 *task.command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(BASE_DIR)
+                cwd=str(BASE_DIR),
+                env=env
             )
 
             # Lire la sortie en temps réel
