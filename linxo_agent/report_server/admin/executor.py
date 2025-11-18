@@ -119,6 +119,7 @@ class TaskExecutor:
             # Exécuter la commande
             process = await asyncio.create_subprocess_exec(
                 *task.command,
+                stdin=asyncio.subprocess.DEVNULL,  # Fermer stdin pour éviter les blocages
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(BASE_DIR),
