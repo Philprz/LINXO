@@ -56,13 +56,27 @@ def _setup_chromedriver_cache_redirect():
     _ORIGINAL_PATCHER_INIT = patcher_module.Patcher.__init__
 
     def patched_init(self, *args, **kwargs):
-        """Patcher __init__ pour rediriger data_path"""
+        """Patcher __init__ pour rediriger data_path ET executable_path"""
         # Appeler l'init original
         _ORIGINAL_PATCHER_INIT(self, *args, **kwargs)
 
         # Rediriger data_path si le cache_dir est configuré
         if _CHROMEDRIVER_CACHE_DIR:
+            old_data_path = self.data_path
             self.data_path = str(_CHROMEDRIVER_CACHE_DIR)
+
+            # CRITIQUE: Reconstruire executable_path avec le nouveau data_path
+            # car il a été construit dans l'init original avec l'ancien chemin
+            if hasattr(self, 'executable_path') and old_data_path in str(self.executable_path):
+                self.executable_path = str(self.executable_path).replace(
+                    old_data_path,
+                    str(_CHROMEDRIVER_CACHE_DIR)
+                )
+            else:
+                # Fallback: construire le chemin manuellement
+                import os
+                exe_name = 'chromedriver.exe' if os.name == 'nt' else 'chromedriver'
+                self.executable_path = os.path.join(str(_CHROMEDRIVER_CACHE_DIR), exe_name)
 
     # Remplacer __init__ au niveau du module
     patcher_module.Patcher.__init__ = patched_init
