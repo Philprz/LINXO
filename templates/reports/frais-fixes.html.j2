@@ -1,0 +1,140 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Frais Fixes - Rapport Linxo{% endblock %}
+
+{% block header_title %}💳 Frais Récurrents (Fixes){% endblock %}
+{% block header_subtitle %}Rapport du {{ report_date }}{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb">
+    <a href="{{ index_url }}">← Retour à l'index</a>
+</nav>
+
+<div class="summary-card">
+    <div class="summary-item">
+        <span class="summary-label">Total prélevé</span>
+        <span class="summary-value">{{ "%.2f"|format(total_preleve) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Total prévu</span>
+        <span class="summary-value">{{ "%.2f"|format(total_prevu) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Frais détectés</span>
+        <span class="summary-value">{{ nb_preleves }}/{{ nb_total }}</span>
+    </div>
+</div>
+
+{% if en_attente|length > 0 %}
+<div class="section">
+    <h2>⏳ En attente de prélèvement</h2>
+    <p class="section-description">Frais fixes attendus ce mois-ci mais pas encore détectés</p>
+
+    <table class="transactions-table">
+        <thead>
+            <tr>
+                <th>Libellé</th>
+                <th>Compte</th>
+                <th class="text-center">Jour prévu</th>
+                <th class="text-right">Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for frais in en_attente %}
+            <tr>
+                <td class="libelle-cell">
+                    {{ frais.libelle }}
+                    {% if frais.commentaire %}
+                    <br><small style="color: #666;">{{ frais.commentaire }}</small>
+                    {% endif %}
+                </td>
+                <td>{{ frais.compte }}</td>
+                <td class="text-center">{{ frais.jour_prelevement }}</td>
+                <td class="amount-cell text-right">{{ "%.2f"|format(frais.montant) }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="3"><strong>TOTAL EN ATTENTE</strong></td>
+                <td class="text-right"><strong>{{ "%.2f"|format(total_en_attente) }} €</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endif %}
+
+<div class="section">
+    <h2>✅ Frais déjà prélevés</h2>
+    <p class="section-description">Frais fixes détectés dans les transactions du mois</p>
+
+    {% if preleves|length == 0 %}
+    <p style="text-align: center; color: #999; padding: 2rem;">Aucun frais fixe détecté pour le moment</p>
+    {% else %}
+    <table class="transactions-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Libellé</th>
+                <th>Compte</th>
+                <th class="text-right">Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for frais in preleves %}
+            <tr>
+                <td class="date-cell">{{ frais.date }}</td>
+                <td class="libelle-cell">
+                    {{ frais.libelle }}
+                    {% if frais.commentaire_config %}
+                    <br><small style="color: #666;">{{ frais.commentaire_config }}</small>
+                    {% endif %}
+                </td>
+                <td>{{ frais.compte }}</td>
+                <td class="amount-cell text-right">{{ "%.2f"|format(frais.montant) }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="3"><strong>TOTAL PRÉLEVÉ</strong></td>
+                <td class="text-right"><strong>{{ "%.2f"|format(total_preleve) }} €</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+    {% endif %}
+</div>
+
+{% if non_appliques|length > 0 %}
+<div class="section">
+    <h2>❌ Frais non applicables ce mois-ci</h2>
+    <p class="section-description">Frais configurés mais non attendus pour ce mois (périodicité)</p>
+
+    <table class="transactions-table">
+        <thead>
+            <tr>
+                <th>Libellé</th>
+                <th>Compte</th>
+                <th class="text-center">Périodicité</th>
+                <th class="text-right">Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for frais in non_appliques %}
+            <tr style="opacity: 0.6;">
+                <td class="libelle-cell">
+                    {{ frais.libelle }}
+                    {% if frais.commentaire %}
+                    <br><small style="color: #666;">{{ frais.commentaire }}</small>
+                    {% endif %}
+                </td>
+                <td>{{ frais.compte }}</td>
+                <td class="text-center">{{ frais.periodicite }}</td>
+                <td class="amount-cell text-right">{{ "%.2f"|format(frais.montant) }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

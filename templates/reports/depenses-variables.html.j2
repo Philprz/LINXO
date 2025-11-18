@@ -1,0 +1,268 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Dépenses Variables - Rapport Linxo{% endblock %}
+
+{% block header_title %}🛒 Dépenses Variables{% endblock %}
+{% block header_subtitle %}Rapport du {{ report_date }}{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb">
+    <a href="{{ index_url }}">← Retour à l'index</a>
+</nav>
+
+<div class="summary-card">
+    <div class="summary-item">
+        <span class="summary-label">Total dépensé</span>
+        <span class="summary-value">{{ "%.2f"|format(total_variables) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Budget mensuel</span>
+        <span class="summary-value">{{ "%.2f"|format(budget_max) }} €</span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Reste disponible</span>
+        <span class="summary-value" style="color: {{ 'green' if reste >= 0 else 'red' }};">
+            {{ "%.2f"|format(reste) }} €
+        </span>
+    </div>
+    <div class="summary-item">
+        <span class="summary-label">Nombre de transactions</span>
+        <span class="summary-value">{{ nb_transactions }}</span>
+    </div>
+</div>
+
+{% if budget_max > 0 %}
+<div class="progress-section">
+    <h3>Avancement du budget</h3>
+    <div class="progress-info">
+        <span>Jour {{ jour_actuel }}/{{ dernier_jour }} du mois ({{ "%.0f"|format(avancement_mois) }}%)</span>
+        <span>Dépensé: {{ "%.0f"|format(pourcentage) }}%</span>
+    </div>
+    <div class="progress-bar-container">
+        <div class="progress-bar-fill" style="width: {{ "%.1f"|format(pourcentage) }}%; background: {{ couleur_barre }};">
+            {{ "%.0f"|format(pourcentage) }}%
+        </div>
+        <div class="progress-marker-100"></div>
+        <div class="progress-marker-time" style="left: {{ "%.1f"|format(avancement_mois) }}%;">
+            <span class="marker-label">Aujourd'hui</span>
+        </div>
+    </div>
+    <p class="progress-hint">
+        {% if pourcentage > avancement_mois + 10 %}
+        ⚠️ Vous êtes en avance sur votre budget (dépensé {{ "%.0f"|format(pourcentage - avancement_mois) }}% de plus que prévu)
+        {% elif pourcentage < avancement_mois - 10 %}
+        ✅ Vous êtes en retard sur votre budget (économisé {{ "%.0f"|format(avancement_mois - pourcentage) }}% de plus que prévu)
+        {% else %}
+        👍 Votre rythme de dépenses est conforme au budget
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<div class="section">
+    <h2>📊 Répartition par catégorie</h2>
+    <p class="section-description">Cliquez sur une catégorie pour filtrer le tableau ci-dessous</p>
+
+    <div id="categories-filter" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+        <button class="filter-btn active" data-category="all">
+            Toutes ({{ nb_transactions }})
+        </button>
+        {% for cat in categories %}
+        <button class="filter-btn" data-category="{{ cat.name }}">
+            {{ cat.name }} ({{ cat.count }}) - {{ "%.2f"|format(cat.total) }} €
+        </button>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Détail des transactions</h2>
+    <p class="section-description">
+        <span id="count-display">{{ nb_transactions }} transactions affichées</span>
+        | Tri par défaut : date décroissante
+    </p>
+
+    <table class="transactions-table" id="transactions-table">
+        <thead>
+            <tr>
+                <th class="sortable" data-sort="date">Date <span class="sort-icon">▼</span></th>
+                <th class="sortable" data-sort="categorie">Catégorie <span class="sort-icon"></span></th>
+                <th class="sortable" data-sort="libelle">Libellé <span class="sort-icon"></span></th>
+                <th class="sortable" data-sort="compte">Compte <span class="sort-icon"></span></th>
+                <th class="sortable text-right" data-sort="montant">Montant <span class="sort-icon"></span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for transaction in transactions %}
+            <tr data-category="{{ transaction.categorie }}">
+                <td class="date-cell" data-date="{{ transaction.date }}">{{ transaction.date }}</td>
+                <td class="categorie-cell">{{ transaction.categorie }}</td>
+                <td class="libelle-cell">{{ transaction.libelle }}</td>
+                <td class="compte-cell">{{ transaction.compte }}</td>
+                <td class="amount-cell text-right" data-amount="{{ transaction.montant }}">{{ "%.2f"|format(transaction.montant) }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="4"><strong>TOTAL <span id="total-label">GLOBAL</span></strong></td>
+                <td class="text-right"><strong id="total-amount">{{ "%.2f"|format(total_variables) }} €</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<style>
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover {
+    background: #f0f0f0;
+}
+
+.filter-btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.compte-cell {
+    font-size: 0.9em;
+    color: #666;
+}
+</style>
+
+<script>
+// Système de filtrage par catégorie
+(function() {
+    const table = document.getElementById('transactions-table');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const countDisplay = document.getElementById('count-display');
+    const totalLabel = document.getElementById('total-label');
+    const totalAmount = document.getElementById('total-amount');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    let currentFilter = 'all';
+    let currentSort = { column: 'date', order: 'desc' };
+
+    // Fonction de filtrage
+    function filterByCategory(category) {
+        currentFilter = category;
+        let visibleCount = 0;
+        let visibleTotal = 0;
+
+        rows.forEach(row => {
+            const rowCategory = row.dataset.category;
+            const shouldShow = category === 'all' || rowCategory === category;
+
+            row.style.display = shouldShow ? '' : 'none';
+
+            if (shouldShow) {
+                visibleCount++;
+                visibleTotal += parseFloat(row.querySelector('.amount-cell').dataset.amount || 0);
+            }
+        });
+
+        // Mise à jour de l'affichage
+        countDisplay.textContent = `${visibleCount} transaction${visibleCount > 1 ? 's' : ''} affichée${visibleCount > 1 ? 's' : ''}`;
+        totalLabel.textContent = category === 'all' ? 'GLOBAL' : category.toUpperCase();
+        totalAmount.textContent = `${visibleTotal.toFixed(2)} €`;
+
+        // Mise à jour des boutons
+        filterButtons.forEach(btn => {
+            if (btn.dataset.category === category) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    // Événements de clic sur les boutons de filtre
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterByCategory(btn.dataset.category);
+        });
+    });
+
+    // Fonction de tri
+    function parseDate(dateStr) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+        return new Date(0);
+    }
+
+    function sortTable(column, order) {
+        const visibleRows = rows.filter(row => row.style.display !== 'none');
+
+        visibleRows.sort((a, b) => {
+            let aVal, bVal;
+
+            if (column === 'date') {
+                aVal = parseDate(a.querySelector('.date-cell').dataset.date || a.querySelector('.date-cell').textContent);
+                bVal = parseDate(b.querySelector('.date-cell').dataset.date || b.querySelector('.date-cell').textContent);
+            } else if (column === 'montant') {
+                aVal = parseFloat(a.querySelector('.amount-cell').dataset.amount || 0);
+                bVal = parseFloat(b.querySelector('.amount-cell').dataset.amount || 0);
+            } else if (column === 'categorie') {
+                aVal = a.querySelector('.categorie-cell').textContent.toLowerCase();
+                bVal = b.querySelector('.categorie-cell').textContent.toLowerCase();
+            } else if (column === 'libelle') {
+                aVal = a.querySelector('.libelle-cell').textContent.toLowerCase();
+                bVal = b.querySelector('.libelle-cell').textContent.toLowerCase();
+            } else if (column === 'compte') {
+                aVal = a.querySelector('.compte-cell').textContent.toLowerCase();
+                bVal = b.querySelector('.compte-cell').textContent.toLowerCase();
+            }
+
+            if (aVal < bVal) return order === 'asc' ? -1 : 1;
+            if (aVal > bVal) return order === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        // Réorganiser les lignes visibles
+        visibleRows.forEach(row => tbody.appendChild(row));
+
+        // Mettre à jour les icônes de tri
+        const headers = table.querySelectorAll('th.sortable');
+        headers.forEach(header => {
+            const icon = header.querySelector('.sort-icon');
+            if (header.dataset.sort === column) {
+                icon.textContent = order === 'asc' ? '▲' : '▼';
+            } else {
+                icon.textContent = '';
+            }
+        });
+    }
+
+    // Événements de tri
+    const headers = table.querySelectorAll('th.sortable');
+    headers.forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            let order = 'asc';
+
+            if (currentSort.column === column) {
+                order = currentSort.order === 'asc' ? 'desc' : 'asc';
+            }
+
+            currentSort = { column, order };
+            sortTable(column, order);
+        });
+    });
+
+    // Tri initial par date décroissante
+    sortTable('date', 'desc');
+})();
+</script>
+{% endblock %}

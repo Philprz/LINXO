@@ -39,47 +39,43 @@ except ImportError:
 # CORRECTION GLOBALE : Monkey-patch de undetected_chromedriver au niveau du module
 # pour éviter l'erreur "Read-only file system" sur VPS avec ProtectHome=read-only
 _CHROMEDRIVER_CACHE_DIR = None
-_ORIGINAL_PATCHER_INIT = None
+_ORIGINAL_PATCHER_AUTO = None
 
 
 def _setup_chromedriver_cache_redirect():
     """Configure la redirection du cache chromedriver vers un dossier accessible"""
-    global _CHROMEDRIVER_CACHE_DIR, _ORIGINAL_PATCHER_INIT
+    global _CHROMEDRIVER_CACHE_DIR, _ORIGINAL_PATCHER_AUTO
 
     # Ne faire le setup qu'une seule fois
-    if _ORIGINAL_PATCHER_INIT is not None:
+    if _ORIGINAL_PATCHER_AUTO is not None:
         return
 
     import undetected_chromedriver.patcher as patcher_module
 
-    # Sauvegarder la méthode originale
-    _ORIGINAL_PATCHER_INIT = patcher_module.Patcher.__init__
+    # Sauvegarder la méthode originale auto()
+    _ORIGINAL_PATCHER_AUTO = patcher_module.Patcher.auto
 
-    def patched_init(self, *args, **kwargs):
-        """Patcher __init__ pour rediriger data_path ET executable_path"""
-        # Appeler l'init original
-        _ORIGINAL_PATCHER_INIT(self, *args, **kwargs)
-
-        # Rediriger data_path si le cache_dir est configuré
+    def patched_auto(self, *args, **kwargs):
+        """Patcher auto() pour rediriger tous les chemins vers le cache personnalisé"""
+        # CRITIQUE: Rediriger AVANT l'appel à auto() pour éviter les opérations
+        # sur le système de fichiers read-only
         if _CHROMEDRIVER_CACHE_DIR:
-            old_data_path = self.data_path
+            # Forcer data_path vers notre cache
             self.data_path = str(_CHROMEDRIVER_CACHE_DIR)
 
-            # CRITIQUE: Reconstruire executable_path avec le nouveau data_path
-            # car il a été construit dans l'init original avec l'ancien chemin
-            if hasattr(self, 'executable_path') and old_data_path in str(self.executable_path):
-                self.executable_path = str(self.executable_path).replace(
-                    old_data_path,
-                    str(_CHROMEDRIVER_CACHE_DIR)
-                )
-            else:
-                # Fallback: construire le chemin manuellement
-                import os
-                exe_name = 'chromedriver.exe' if os.name == 'nt' else 'chromedriver'
-                self.executable_path = os.path.join(str(_CHROMEDRIVER_CACHE_DIR), exe_name)
+            # Reconstruire executable_path avec le nouveau data_path
+            exe_name = 'chromedriver.exe' if os.name == 'nt' else 'chromedriver'
+            self.executable_path = os.path.join(str(_CHROMEDRIVER_CACHE_DIR), exe_name)
 
-    # Remplacer __init__ au niveau du module
-    patcher_module.Patcher.__init__ = patched_init
+            # S'assurer que le dossier existe
+            import os
+            os.makedirs(str(_CHROMEDRIVER_CACHE_DIR), exist_ok=True)
+
+        # Appeler la méthode originale
+        return _ORIGINAL_PATCHER_AUTO(self, *args, **kwargs)
+
+    # Remplacer auto() au niveau du module
+    patcher_module.Patcher.auto = patched_auto
 
 
 # Appliquer le monkey patch immédiatement

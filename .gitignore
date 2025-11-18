@@ -55,6 +55,7 @@ reports/
 
 # Templates et static (à versionner)
 !templates/
+!templates/reports/
 !static/
 
 # Backups
