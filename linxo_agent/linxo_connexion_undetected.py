@@ -57,6 +57,8 @@ def _setup_chromedriver_cache_redirect():
 
     def patched_auto(self, *args, **kwargs):
         """Patcher auto() pour rediriger tous les chemins vers le cache personnalisé"""
+        import os
+
         # CRITIQUE: Rediriger AVANT l'appel à auto() pour éviter les opérations
         # sur le système de fichiers read-only
         if _CHROMEDRIVER_CACHE_DIR:
@@ -68,7 +70,6 @@ def _setup_chromedriver_cache_redirect():
             self.executable_path = os.path.join(str(_CHROMEDRIVER_CACHE_DIR), exe_name)
 
             # S'assurer que le dossier existe
-            import os
             os.makedirs(str(_CHROMEDRIVER_CACHE_DIR), exist_ok=True)
 
         # Appeler la méthode originale
