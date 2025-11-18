@@ -63,11 +63,20 @@ def _setup_chromedriver_cache_redirect():
         # sur le système de fichiers read-only
         if _CHROMEDRIVER_CACHE_DIR:
             # Forcer data_path vers notre cache
+            old_data_path = self.data_path
             self.data_path = str(_CHROMEDRIVER_CACHE_DIR)
 
             # Reconstruire executable_path avec le nouveau data_path
             exe_name = 'chromedriver.exe' if os.name == 'nt' else 'chromedriver'
             self.executable_path = os.path.join(str(_CHROMEDRIVER_CACHE_DIR), exe_name)
+
+            # CRITIQUE: Aussi rediriger zip_path qui est utilisé par unzip_package()
+            # zip_path est construit dans __init__ à partir de data_path
+            if hasattr(self, 'zip_path') and old_data_path in str(self.zip_path):
+                self.zip_path = str(self.zip_path).replace(
+                    old_data_path,
+                    str(_CHROMEDRIVER_CACHE_DIR)
+                )
 
             # S'assurer que le dossier existe
             os.makedirs(str(_CHROMEDRIVER_CACHE_DIR), exist_ok=True)
