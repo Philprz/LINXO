@@ -63,13 +63,17 @@
     <h2>📊 Répartition par catégorie</h2>
     <p class="section-description">Cliquez sur une catégorie pour filtrer le tableau ci-dessous</p>
 
-    <div id="categories-filter" style="margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    <div id="categories-filter" class="categories-grid">
         <button class="filter-btn active" data-category="all">
-            Toutes ({{ nb_transactions }})
+            <strong>Toutes</strong> <span class="badge">{{ nb_transactions }}</span>
         </button>
         {% for cat in categories %}
         <button class="filter-btn" data-category="{{ cat.name }}">
-            {{ cat.name }} ({{ cat.count }}) - {{ "%.2f"|format(cat.total) }} €
+            <div class="cat-name">{{ cat.name }}</div>
+            <div class="cat-stats">
+                <span class="badge">{{ cat.count }}</span>
+                <span class="cat-amount">{{ "%.2f"|format(cat.total) }} €</span>
+            </div>
         </button>
         {% endfor %}
     </div>
@@ -79,17 +83,17 @@
     <h2>Détail des transactions</h2>
     <p class="section-description">
         <span id="count-display">{{ nb_transactions }} transactions affichées</span>
-        | Tri par défaut : date décroissante
+        | Tri par défaut : montant décroissant
     </p>
 
     <table class="transactions-table" id="transactions-table">
         <thead>
             <tr>
-                <th class="sortable" data-sort="date">Date <span class="sort-icon">▼</span></th>
+                <th class="sortable" data-sort="date">Date <span class="sort-icon"></span></th>
                 <th class="sortable" data-sort="categorie">Catégorie <span class="sort-icon"></span></th>
                 <th class="sortable" data-sort="libelle">Libellé <span class="sort-icon"></span></th>
                 <th class="sortable" data-sort="compte">Compte <span class="sort-icon"></span></th>
-                <th class="sortable text-right" data-sort="montant">Montant <span class="sort-icon"></span></th>
+                <th class="sortable text-right" data-sort="montant">Montant <span class="sort-icon">▼</span></th>
             </tr>
         </thead>
         <tbody>
@@ -113,29 +117,94 @@
 </div>
 
 <style>
+.categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
 .filter-btn {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ddd;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e0e0e0;
     background: white;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.9rem;
     transition: all 0.2s;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .filter-btn:hover {
-    background: #f0f0f0;
+    background: #f8f9fa;
+    border-color: #007bff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
 }
 
 .filter-btn.active {
-    background: #007bff;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     color: white;
-    border-color: #007bff;
+    border-color: #0056b3;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
+}
+
+.filter-btn.active .cat-name,
+.filter-btn.active .cat-stats {
+    color: white;
+}
+
+.cat-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+
+.cat-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.badge {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.filter-btn.active .badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+}
+
+.cat-amount {
+    font-weight: 600;
+    color: #dc3545;
+    margin-left: auto;
+}
+
+.filter-btn.active .cat-amount {
+    color: white;
 }
 
 .compte-cell {
     font-size: 0.9em;
     color: #666;
+}
+
+@media (max-width: 768px) {
+    .categories-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
@@ -261,8 +330,8 @@
         });
     });
 
-    // Tri initial par date décroissante
-    sortTable('date', 'desc');
+    // Tri initial par montant décroissant (du plus grand au plus petit)
+    sortTable('montant', 'desc');
 })();
 </script>
 {% endblock %}

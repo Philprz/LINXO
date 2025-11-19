@@ -666,10 +666,26 @@ def build_frais_fixes_page(
         else:
             non_appliques.append(frais)
 
+    # Trier les listes par montant décroissant (du plus grand au plus petit)
+    preleves.sort(key=lambda x: x['montant'], reverse=True)
+    en_attente.sort(key=lambda x: x.get('montant', 0.0), reverse=True)
+    non_appliques.sort(key=lambda x: x.get('montant', 0.0), reverse=True)
+
     # Calculs des totaux
     total_preleve = sum(f['montant'] for f in preleves)
     total_en_attente = sum(f.get('montant', 0.0) for f in en_attente)
-    total_prevu = total_preleve + total_en_attente
+
+    # Calculer le total prévu basé sur les montants de la config (cohérent)
+    # Pour les frais prélevés, on utilise le montant de la config
+    total_prevu_config = 0.0
+    for frais in depenses_fixes_ref:
+        mois_occurrence = frais.get('mois_occurrence', list(range(1, 13)))
+        if mois_actuel in mois_occurrence:
+            total_prevu_config += frais.get('montant', 0.0)
+
+    total_prevu = total_prevu_config  # Total cohérent basé uniquement sur la config
+    ecart = total_preleve - total_prevu  # Écart entre réel et prévu
+
     nb_preleves = len(preleves)
     nb_total = len(preleves) + len(en_attente)
 
@@ -691,6 +707,7 @@ def build_frais_fixes_page(
         "total_preleve": total_preleve,
         "total_en_attente": total_en_attente,
         "total_prevu": total_prevu,
+        "ecart": ecart,
         "nb_preleves": nb_preleves,
         "nb_total": nb_total,
     }
