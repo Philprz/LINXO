@@ -43,6 +43,9 @@ EXCLUSIONS = {
         r'VIR\s+SEPA.*INTERNE',
         r'VIR\s+INST.*INTERNE',
         r'VIREMENT.*INTERNE',
+        # Virements depuis/vers des comptes d'épargne personnels
+        r'VIR(EMENT)?\s+(DEPUIS|VERS)\s+(LIVRET|COMPTE|CEL|PEL|LDD)',
+        r'TRANSFERT\s+(DEPUIS|VERS)\s+(LIVRET|COMPTE|CEL|PEL|LDD)',
     ],
     'preautorisation_carburant': [
         # Détection des préautorisations carburant (montants ronds typiques)
@@ -61,6 +64,8 @@ EXCLUSIONS = {
         'Prél. carte débit différé',
         'Prél. carte debit differe',
         'Virements internes',
+        'Virement interne',  # Variante au singulier
+        'Déblocage prêt, crédits, réserves',  # Catégorie Linxo pour virements internes
     ],
     'marchands_internes': [
         r'AMAZON\s+PAYMENTS',
