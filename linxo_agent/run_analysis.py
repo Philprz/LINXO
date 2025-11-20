@@ -27,7 +27,12 @@ def should_send_notification(frequency='weekly', notification_file='.last_whatsa
     Détermine si une notification doit être envoyée selon la fréquence configurée.
 
     Args:
-        frequency: Fréquence d'envoi ('daily', 'weekly', 'monthly', ou nombre de jours)
+        frequency: Fréquence d'envoi:
+            - 'daily': tous les jours
+            - 'weekly': tous les 7 jours
+            - 'monthly': tous les 30 jours
+            - 'monday', 'tuesday', ..., 'sunday': jour spécifique de la semaine
+            - nombre (int ou str): tous les N jours
         notification_file: Fichier stockant la date de dernière notification
 
     Returns:
@@ -48,12 +53,41 @@ def should_send_notification(frequency='weekly', notification_file='.last_whatsa
             print(f"[WARN] Erreur lecture {notification_file}: {e}")
             last_notification_date = None
 
+    now = datetime.now()
+
+    # Jours de la semaine (0=Lundi, 6=Dimanche)
+    weekdays = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6
+    }
+
+    # Vérifier si c'est un jour de semaine spécifique
+    if isinstance(frequency, str) and frequency.lower() in weekdays:
+        target_weekday = weekdays[frequency.lower()]
+        current_weekday = now.weekday()
+
+        # Si ce n'est pas le bon jour, skip
+        if current_weekday != target_weekday:
+            day_names = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+            print(f"[INFO] Notification WhatsApp programmée pour {frequency} (aujourd'hui: {day_names[current_weekday]})")
+            return False
+
+        # C'est le bon jour, vérifier si pas déjà envoyé cette semaine
+        if last_notification_date is not None:
+            # Vérifier si dernier envoi était dans les 6 derniers jours (même semaine)
+            delta = now - last_notification_date
+            if delta < timedelta(days=6):
+                print(f"[INFO] Notification WhatsApp déjà envoyée cette semaine (le {last_notification_date.strftime('%Y-%m-%d')})")
+                return False
+
+        print(f"[INFO] Notification WhatsApp due (jour: {frequency})")
+        return True
+
     # Si jamais envoyé, envoyer maintenant
     if last_notification_date is None:
         return True
 
     # Calculer le délai selon la fréquence
-    now = datetime.now()
     delta = now - last_notification_date
 
     if frequency == 'daily':
