@@ -33,6 +33,17 @@ source "$VENV_PATH/bin/activate" || {
     exit 1
 }
 
+# IMPORTANT: Exporter DISPLAY pour WhatsApp/Chrome avec Xvfb
+echo "🖥️  Configuration de l'affichage virtuel (Xvfb)..."
+export DISPLAY=:99
+
+# Vérifier que Xvfb tourne
+if ! pgrep -x "Xvfb" > /dev/null; then
+    echo "⚠️  ATTENTION: Xvfb n'est pas en cours d'exécution!"
+    echo "   WhatsApp ne pourra pas fonctionner."
+    echo "   Conseil: Activez le service systemd xvfb.service"
+fi
+
 # ÉTAPE 1: Télécharger le CSV depuis Linxo
 echo "📥 Téléchargement du CSV depuis Linxo..."
 python linxo_agent.py --skip-notifications
