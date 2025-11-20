@@ -1050,6 +1050,69 @@ print(f'SMS envoyé avec succès' if result else 'Échec envoi SMS')
     })
 
 
+@router.post("/api/test-whatsapp")
+async def api_test_whatsapp(
+    authenticated: bool = Depends(verify_admin_auth)
+):
+    """
+    Envoie un message WhatsApp de test
+
+    Args:
+        authenticated: Dépendance d'authentification
+
+    Returns:
+        JSONResponse: ID de la tâche lancée
+    """
+    import sys
+    python_exe = sys.executable
+
+    command = [
+        python_exe,
+        "-c",
+        """
+import sys
+sys.path.insert(0, '.')
+from linxo_agent.config import get_config
+from linxo_agent.whatsapp_sender import envoyer_message_whatsapp
+
+config = get_config()
+
+# Déterminer le destinataire (groupe ou premier contact)
+if config.whatsapp_group_name:
+    destinataire = config.whatsapp_group_name
+elif config.whatsapp_contacts:
+    destinataire = config.whatsapp_contacts[0]
+else:
+    print('Erreur: Aucun destinataire WhatsApp configuré')
+    sys.exit(1)
+
+message = '''[TEST] Message de test depuis l'interface admin
+
+Ce message a été envoyé automatiquement pour tester la configuration WhatsApp.'''
+
+result = envoyer_message_whatsapp(
+    destinataire=destinataire,
+    message=message,
+    profile_dir=config.whatsapp_profile_dir,
+    headless=config.whatsapp_headless
+)
+
+if result.get('success'):
+    print(f"WhatsApp envoyé avec succès à '{destinataire}'")
+else:
+    print(f"Échec envoi WhatsApp: {result.get('error', 'Erreur inconnue')}")
+"""
+    ]
+
+    task_id = await executor.execute_task("Test WhatsApp", command)
+
+    return JSONResponse(content={
+        'success': True,
+        'task_id': task_id,
+        'message': 'Test WhatsApp lancé'
+    })
+
+
 @router.get("/api/task/{task_id}")
 async def api_get_task_status(
     task_id: str,

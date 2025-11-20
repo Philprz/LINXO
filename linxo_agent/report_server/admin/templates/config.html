@@ -349,6 +349,10 @@
                        onkeypress="handleWhatsappKeypress(event)">
                 <p class="helper-text">Utilisez les noms exacts tels qu'ils apparaissent dans WhatsApp</p>
             </div>
+
+            <div style="margin-top: 1rem;">
+                <button class="btn btn-secondary" onclick="testWhatsapp()">🧪 Envoyer un message de test</button>
+            </div>
         </div>
     </div>
 
@@ -942,7 +946,61 @@
             if (result.success) {
                 showNotification('URL mise à jour', 'success');
             } else {
-                showNotification('Échec mise à jour de l’URL', 'error');
+                showNotification('Échec mise à jour de l'URL', 'error');
+            }
+        } catch (error) {
+            showNotification('Erreur: ' + error.message, 'error');
+        }
+    }
+
+    async function testWhatsapp() {
+        // Vérifier que WhatsApp est activé
+        if (!document.getElementById('whatsapp-enabled').checked) {
+            showNotification('WhatsApp n\'est pas activé', 'error');
+            return;
+        }
+
+        // Vérifier qu'il y a au moins un destinataire
+        const groupName = document.getElementById('whatsapp-group').value.trim();
+        if (!groupName && whatsappList.length === 0) {
+            showNotification('Veuillez configurer un groupe ou des contacts', 'error');
+            return;
+        }
+
+        if (!confirm('Envoyer un message de test WhatsApp ?')) {
+            return;
+        }
+
+        try {
+            showNotification('Envoi du test WhatsApp en cours...', 'info');
+
+            const response = await fetch('/admin/api/test-whatsapp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.task_id) {
+                showNotification('Test WhatsApp lancé - Vérifiez vos messages', 'success');
+
+                // Optionnel: polling pour vérifier le statut de la tâche
+                setTimeout(async () => {
+                    try {
+                        const statusResponse = await fetch(`/admin/api/task/${result.task_id}`);
+                        const statusData = await statusResponse.json();
+
+                        if (statusData.status === 'completed') {
+                            showNotification('Test WhatsApp terminé avec succès', 'success');
+                        } else if (statusData.status === 'failed') {
+                            showNotification('Échec du test WhatsApp - Vérifiez les logs', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Erreur vérification statut:', error);
+                    }
+                }, 5000);
+            } else {
+                showNotification('Échec lancement test WhatsApp', 'error');
             }
         } catch (error) {
             showNotification('Erreur: ' + error.message, 'error');
