@@ -312,6 +312,46 @@
                onkeypress="handleSmsKeypress(event)">
     </div>
 
+    <div class="form-group" style="margin-bottom: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+            <input type="checkbox" id="whatsapp-enabled" style="width: auto; margin-right: 0.5rem;">
+            <label class="form-label" style="margin: 0;">Activer les notifications WhatsApp</label>
+        </div>
+
+        <div id="whatsapp-config" style="display: none;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Nom du groupe WhatsApp</label>
+                    <input type="text" class="form-input" id="whatsapp-group" placeholder="Ex: Liste de courses">
+                    <p class="helper-text">Laissez vide si vous envoyez à des contacts individuels</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fréquence d'envoi</label>
+                    <select class="form-select" id="whatsapp-frequency">
+                        <option value="daily">Quotidien</option>
+                        <option value="weekly">Hebdomadaire</option>
+                        <option value="monthly">Mensuel</option>
+                        <option value="monday">Tous les lundis</option>
+                        <option value="tuesday">Tous les mardis</option>
+                        <option value="wednesday">Tous les mercredis</option>
+                        <option value="thursday">Tous les jeudis</option>
+                        <option value="friday">Tous les vendredis</option>
+                        <option value="saturday">Tous les samedis</option>
+                        <option value="sunday">Tous les dimanches</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Contacts WhatsApp individuels</label>
+                <div id="whatsapp-tags" class="tag-list"></div>
+                <input type="text" class="form-input" id="whatsapp-input" placeholder="Ajouter un contact (nom exact)"
+                       onkeypress="handleWhatsappKeypress(event)">
+                <p class="helper-text">Utilisez les noms exacts tels qu'ils apparaissent dans WhatsApp</p>
+            </div>
+        </div>
+    </div>
+
     <button class="btn btn-primary" onclick="updateRecipients()">💾 Sauvegarder les destinataires</button>
 </div>
 
@@ -515,6 +555,10 @@
 <script>
     let emailList = [];
     let smsList = [];
+    let whatsappList = [];
+    let whatsappEnabled = false;
+    let whatsappGroup = '';
+    let whatsappFrequency = 'weekly';
     let financeCache = {depenses_fixes: [], revenus: [], ajustements_budget: []};
     let currentExpenseId = null;
     let currentIncomeId = null;
@@ -620,8 +664,22 @@
             emailList = data.email || [];
             smsList = data.sms || [];
 
+            // WhatsApp configuration
+            if (data.whatsapp) {
+                whatsappEnabled = data.whatsapp.enabled || false;
+                whatsappGroup = data.whatsapp.group_name || '';
+                whatsappList = data.whatsapp.contacts || [];
+                whatsappFrequency = data.whatsapp.frequency || 'weekly';
+
+                document.getElementById('whatsapp-enabled').checked = whatsappEnabled;
+                document.getElementById('whatsapp-group').value = whatsappGroup;
+                document.getElementById('whatsapp-frequency').value = whatsappFrequency;
+                toggleWhatsappConfig();
+            }
+
             renderEmailTags();
             renderSmsTags();
+            renderWhatsappTags();
         } catch (error) {
             console.error('Erreur chargement destinataires:', error);
         }
@@ -773,6 +831,45 @@
         renderSmsTags();
     }
 
+    function renderWhatsappTags() {
+        const container = document.getElementById('whatsapp-tags');
+        container.innerHTML = whatsappList.map(contact => `
+            <span class="tag">
+                ${contact}
+                <span class="tag-remove" onclick="removeWhatsapp('${contact}')">×</span>
+            </span>
+        `).join('');
+    }
+
+    function handleWhatsappKeypress(event) {
+        if (event.key === 'Enter') {
+            const input = document.getElementById('whatsapp-input');
+            const contact = input.value.trim();
+            if (contact && !whatsappList.includes(contact)) {
+                whatsappList.push(contact);
+                renderWhatsappTags();
+                input.value = '';
+            }
+        }
+    }
+
+    function removeWhatsapp(contact) {
+        whatsappList = whatsappList.filter(c => c !== contact);
+        renderWhatsappTags();
+    }
+
+    function toggleWhatsappConfig() {
+        const enabled = document.getElementById('whatsapp-enabled').checked;
+        const configDiv = document.getElementById('whatsapp-config');
+        configDiv.style.display = enabled ? 'block' : 'none';
+        whatsappEnabled = enabled;
+    }
+
+    // Add event listener for WhatsApp checkbox
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('whatsapp-enabled').addEventListener('change', toggleWhatsappConfig);
+    });
+
     async function updateBudget() {
         const budget = parseInt(document.getElementById('budget-input').value, 10);
 
@@ -801,10 +898,21 @@
 
     async function updateRecipients() {
         try {
+            const whatsappData = {
+                enabled: document.getElementById('whatsapp-enabled').checked,
+                group_name: document.getElementById('whatsapp-group').value.trim(),
+                contacts: whatsappList,
+                frequency: document.getElementById('whatsapp-frequency').value
+            };
+
             const response = await fetch('/admin/api/config/recipients', {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({email: emailList, sms: smsList})
+                body: JSON.stringify({
+                    email: emailList,
+                    sms: smsList,
+                    whatsapp: whatsappData
+                })
             });
 
             const result = await response.json();

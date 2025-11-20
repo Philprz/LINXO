@@ -1283,7 +1283,8 @@ async def api_update_recipients(
 
     success = config_manager.update_notification_recipients(
         emails=data.get('email'),
-        sms=data.get('sms')
+        sms=data.get('sms'),
+        whatsapp=data.get('whatsapp')
     )
 
     return JSONResponse(content={

@@ -126,18 +126,32 @@ class ConfigManager:
             return False
 
     def get_notification_recipients(self) -> Dict[str, Any]:
-        """Récupère les destinataires email/SMS."""
+        """Récupère les destinataires email/SMS/WhatsApp."""
         email_recipients = os.getenv("NOTIFICATION_EMAIL", "").split(",")
         sms_recipients = os.getenv("SMS_RECIPIENT", "").split(",")
+
+        # WhatsApp configuration
+        whatsapp_enabled = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
+        whatsapp_group = os.getenv("WHATSAPP_GROUP_NAME", "").strip()
+        whatsapp_contacts = os.getenv("WHATSAPP_CONTACTS", "").split(",")
+        whatsapp_frequency = os.getenv("NOTIFICATION_FREQUENCY", "weekly").strip()
+
         return {
             "email": [email.strip() for email in email_recipients if email.strip()],
             "sms": [sms.strip() for sms in sms_recipients if sms.strip()],
+            "whatsapp": {
+                "enabled": whatsapp_enabled,
+                "group_name": whatsapp_group if whatsapp_group else "",
+                "contacts": [contact.strip() for contact in whatsapp_contacts if contact.strip()],
+                "frequency": whatsapp_frequency
+            }
         }
 
     def update_notification_recipients(
         self,
         emails: Optional[List[str]] = None,
         sms: Optional[List[str]] = None,
+        whatsapp: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Met à jour les destinataires des notifications."""
         try:
@@ -150,6 +164,31 @@ class ConfigManager:
                 sms_str = ", ".join(sms)
                 set_key(str(self.env_file), "SMS_RECIPIENT", sms_str)
                 os.environ["SMS_RECIPIENT"] = sms_str
+
+            if whatsapp is not None:
+                # WhatsApp enabled
+                enabled = str(whatsapp.get("enabled", False)).lower()
+                set_key(str(self.env_file), "WHATSAPP_ENABLED", enabled)
+                os.environ["WHATSAPP_ENABLED"] = enabled
+
+                # WhatsApp group name
+                group_name = whatsapp.get("group_name", "").strip()
+                set_key(str(self.env_file), "WHATSAPP_GROUP_NAME", group_name)
+                os.environ["WHATSAPP_GROUP_NAME"] = group_name
+
+                # WhatsApp contacts (individual recipients)
+                contacts = whatsapp.get("contacts", [])
+                if isinstance(contacts, list):
+                    contacts_str = ", ".join(contacts)
+                else:
+                    contacts_str = ""
+                set_key(str(self.env_file), "WHATSAPP_CONTACTS", contacts_str)
+                os.environ["WHATSAPP_CONTACTS"] = contacts_str
+
+                # Notification frequency
+                frequency = whatsapp.get("frequency", "weekly").strip()
+                set_key(str(self.env_file), "NOTIFICATION_FREQUENCY", frequency)
+                os.environ["NOTIFICATION_FREQUENCY"] = frequency
 
             return True
         except Exception:
