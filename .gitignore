@@ -39,6 +39,11 @@ chrome_linxo_profile/
 chromedriver*
 geckodriver*
 
+# WhatsApp profile (session persistante)
+whatsapp_profile/
+whatsapp_profile.tar.gz
+.last_whatsapp_notification
+
 # Data files
 data/
 !data/reports/.gitkeep

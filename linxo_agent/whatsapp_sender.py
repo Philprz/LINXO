@@ -29,6 +29,9 @@ def initialiser_driver_whatsapp(profile_dir=None, headless=False):
     Returns:
         WebDriver: Instance du driver Chrome
     """
+    import os
+    import platform
+
     # Gérer None et chaînes vides
     if not profile_dir:
         profile_dir = Path.cwd() / "whatsapp_profile"
@@ -43,6 +46,24 @@ def initialiser_driver_whatsapp(profile_dir=None, headless=False):
     options.add_argument("--profile-directory=Default")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+
+    # Détection environnement serveur (VPS)
+    is_server = platform.system() == "Linux" and not os.environ.get("DISPLAY")
+    if is_server and not os.environ.get("DISPLAY"):
+        logger.warning("Environnement serveur détecté sans DISPLAY - assurez-vous d'utiliser Xvfb")
+
+    # Options supplémentaires pour serveurs Linux
+    if platform.system() == "Linux":
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-background-networking")
+        options.add_argument("--disable-sync")
+        options.add_argument("--metrics-recording-only")
+        options.add_argument("--disable-default-apps")
+        options.add_argument("--mute-audio")
+        options.add_argument("--no-first-run")
+        options.add_argument("--disable-setuid-sandbox")
+        options.add_argument("--disable-web-security")
 
     # WhatsApp Web fonctionne mal en headless, on force la fenêtre visible
     if not headless:
@@ -52,7 +73,9 @@ def initialiser_driver_whatsapp(profile_dir=None, headless=False):
         options.add_argument("--headless=new")
 
     try:
-        driver = uc.Chrome(options=options, use_subprocess=True)
+        # Sur Linux/VPS, ne pas utiliser use_subprocess si on a Xvfb
+        use_subprocess = platform.system() == "Windows"
+        driver = uc.Chrome(options=options, use_subprocess=use_subprocess)
         logger.info("Driver WhatsApp initialisé avec succès")
         return driver
     except Exception as e:
