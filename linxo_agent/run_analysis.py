@@ -8,7 +8,7 @@ Utilise le système d'analyse moderne avec génération de rapports HTML par fam
 import sys
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 # Add the linxo_agent directory to path
@@ -20,6 +20,86 @@ from analyzer import analyser_csv, lire_csv_linxo
 from notifications import NotificationManager
 from config import get_config
 from reports import build_daily_report
+
+
+def should_send_notification(frequency='weekly', notification_file='.last_whatsapp_notification'):
+    """
+    Détermine si une notification doit être envoyée selon la fréquence configurée.
+
+    Args:
+        frequency: Fréquence d'envoi ('daily', 'weekly', 'monthly', ou nombre de jours)
+        notification_file: Fichier stockant la date de dernière notification
+
+    Returns:
+        bool: True si notification doit être envoyée, False sinon
+    """
+    # Déterminer le répertoire de base
+    config = get_config()
+    notification_path = config.base_dir / notification_file
+
+    # Lire la dernière date d'envoi si disponible
+    last_notification_date = None
+    if notification_path.exists():
+        try:
+            with open(notification_path, 'r') as f:
+                last_date_str = f.read().strip()
+                last_notification_date = datetime.fromisoformat(last_date_str)
+        except (ValueError, OSError) as e:
+            print(f"[WARN] Erreur lecture {notification_file}: {e}")
+            last_notification_date = None
+
+    # Si jamais envoyé, envoyer maintenant
+    if last_notification_date is None:
+        return True
+
+    # Calculer le délai selon la fréquence
+    now = datetime.now()
+    delta = now - last_notification_date
+
+    if frequency == 'daily':
+        threshold = timedelta(days=1)
+    elif frequency == 'weekly':
+        threshold = timedelta(days=7)
+    elif frequency == 'monthly':
+        threshold = timedelta(days=30)
+    else:
+        # Fréquence personnalisée en jours
+        try:
+            days = int(frequency)
+            threshold = timedelta(days=days)
+        except (ValueError, TypeError):
+            print(f"[WARN] Fréquence invalide '{frequency}', utilisation de 'weekly' par défaut")
+            threshold = timedelta(days=7)
+
+    should_send = delta >= threshold
+
+    if should_send:
+        print(f"[INFO] Notification WhatsApp due (dernière: {last_notification_date.strftime('%Y-%m-%d')})")
+    else:
+        remaining = threshold - delta
+        remaining_hours = int(remaining.total_seconds() / 3600)
+        print(f"[INFO] Notification WhatsApp pas encore due ({remaining_hours}h restantes)")
+
+    return should_send
+
+
+def mark_notification_sent(notification_file='.last_whatsapp_notification'):
+    """
+    Enregistre la date d'envoi de la dernière notification.
+
+    Args:
+        notification_file: Fichier stockant la date de dernière notification
+    """
+    config = get_config()
+    notification_path = config.base_dir / notification_file
+
+    try:
+        with open(notification_path, 'w') as f:
+            f.write(datetime.now().isoformat())
+        print(f"[INFO] Date notification WhatsApp enregistrée: {notification_path}")
+    except OSError as e:
+        print(f"[WARN] Erreur enregistrement date notification: {e}")
+
 
 def main():
     """Exécute l'analyse avec génération de rapports HTML et notifications"""
@@ -306,9 +386,9 @@ Une intervention technique est nécessaire pour corriger ce problème.
         traceback.print_exc()
         print("Poursuite avec les notifications...")
 
-    # ETAPE 3: Envoi des notifications (email HTML + SMS)
+    # ETAPE 3: Envoi des notifications (email HTML + SMS + WhatsApp)
     print("\n" + "=" * 80)
-    print("ETAPE 3: ENVOI DES NOTIFICATIONS (EMAIL HTML + SMS)")
+    print("ETAPE 3: ENVOI DES NOTIFICATIONS (EMAIL HTML + SMS + WHATSAPP)")
     print("=" * 80)
 
     try:
@@ -322,10 +402,51 @@ Une intervention technique est nécessaire pour corriger ce problème.
         sms_ok = notif_results.get('sms', False)
         email_ok = notif_results.get('email', False)
 
-        if sms_ok or email_ok:
+        # Envoi WhatsApp si activé et si fréquence OK
+        whatsapp_ok = False
+        if config.whatsapp_enabled:
+            # Récupérer la fréquence depuis .env ou utiliser weekly par défaut
+            notification_frequency = os.getenv('NOTIFICATION_FREQUENCY', 'weekly')
+
+            if should_send_notification(frequency=notification_frequency):
+                print("\n[INFO] Envoi notification WhatsApp...")
+
+                # Préparer le message WhatsApp (résumé budget similaire au SMS)
+                try:
+                    from report_formatter_v2 import formater_sms_v2  # type: ignore
+                    total_depenses = float(analysis_result.get('total_variables', 0) or 0)
+                    budget_max = float(analysis_result.get('budget_max', 0) or 0)
+                    reste = budget_max - total_depenses
+                    pct = (total_depenses / budget_max * 100) if budget_max > 0 else 0.0
+                    whatsapp_msg = formater_sms_v2(total_depenses, budget_max, reste, pct)
+                except Exception:  # pylint: disable=broad-except
+                    total_depenses = float(analysis_result.get('total_variables', 0) or 0)
+                    budget_max = float(analysis_result.get('budget_max', 0) or 0)
+                    reste = budget_max - total_depenses
+                    pct = (total_depenses / budget_max * 100) if budget_max > 0 else 0.0
+                    whatsapp_msg = (
+                        f"Budget: {total_depenses:.0f}/{budget_max:.0f}€ "
+                        f"({pct:.0f}%), reste {reste:.0f}€"
+                    )
+
+                # Envoyer via WhatsApp
+                whatsapp_ok = notification_manager.send_whatsapp(whatsapp_msg)
+
+                if whatsapp_ok:
+                    print("[OK] Notification WhatsApp envoyée")
+                    mark_notification_sent()
+                else:
+                    print("[WARN] Échec envoi WhatsApp")
+            else:
+                print("[INFO] Notification WhatsApp non due, skip")
+        else:
+            print("[INFO] WhatsApp désactivé, skip")
+
+        if sms_ok or email_ok or whatsapp_ok:
             print("\nNotifications envoyees!")
             print(f"  Email HTML: {'OK' if email_ok else 'ECHEC'}")
             print(f"  SMS: {'OK' if sms_ok else 'ECHEC'}")
+            print(f"  WhatsApp: {'OK' if whatsapp_ok else 'SKIP/ECHEC'}")
 
             # Marquer le fichier comme envoyé
             config.mark_csv_as_sent(Path(csv_file))

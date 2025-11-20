@@ -1,0 +1,4 @@
+2025/11/20-14:40:44.814 1e98 Reusing MANIFEST C:\Users\PhilippePEREZ\OneDrive\LINXO\whatsapp_profile\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/11/20-14:40:44.815 1e98 Recovering log #153
+2025/11/20-14:40:44.833 1e98 Reusing old log C:\Users\PhilippePEREZ\OneDrive\LINXO\whatsapp_profile\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000153.log 
+2025/11/20-14:40:46.446 66a4 Manual compaction at level-0 from '\x00+\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00,\x00\x00\x00' @ 0 : 0; will stop at (end)

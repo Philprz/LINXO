@@ -109,10 +109,21 @@ class OvhSmsSettings:
 
 
 @dataclass(frozen=True)
+class WhatsAppSettings:
+    """Paramètres WhatsApp (via Selenium + WhatsApp Web)."""
+    enabled: bool = False
+    profile_dir: str = ""  # Chemin vers le profil Chrome persistant
+    group_name: Optional[str] = None  # Nom du groupe WhatsApp (optionnel)
+    contacts: Tuple[str, ...] = field(default_factory=tuple)  # Liste de contacts (optionnel)
+    headless: bool = False  # Mode headless (déconseillé pour WhatsApp)
+
+
+@dataclass(frozen=True)
 class NotificationConfig:
     """Configuration unifiée notifications."""
     emails: Optional[EmailSettings] = None
     ovh_sms: Optional[OvhSmsSettings] = None
+    whatsapp: Optional[WhatsAppSettings] = None
 
 
 def _try_import_get_config() -> Any:
@@ -182,7 +193,20 @@ def _config_from_env() -> NotificationConfig:
             )),
         )
 
-    return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings)
+    # WhatsApp settings
+    whatsapp_settings: Optional[WhatsAppSettings] = None
+    whatsapp_enabled = _env_bool("WHATSAPP_ENABLED", False)
+
+    if whatsapp_enabled:
+        whatsapp_settings = WhatsAppSettings(
+            enabled=True,
+            profile_dir=os.getenv("WHATSAPP_PROFILE_DIR", str(Path.cwd() / "whatsapp_profile")),
+            group_name=os.getenv("WHATSAPP_GROUP_NAME") or None,
+            contacts=tuple(_to_list(os.getenv("WHATSAPP_CONTACTS"))),
+            headless=_env_bool("WHATSAPP_HEADLESS", False),
+        )
+
+    return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings, whatsapp=whatsapp_settings)
 
 
 def load_notification_config() -> NotificationConfig:
@@ -234,7 +258,19 @@ def load_notification_config() -> NotificationConfig:
             default_recipients=tuple(_get(cfg, "sms_recipients", [])),
         )
 
-    return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings)
+    # WhatsApp settings
+    whatsapp_settings: Optional[WhatsAppSettings] = None
+    whatsapp_enabled = bool(_get(cfg, "whatsapp_enabled", False))
+    if whatsapp_enabled:
+        whatsapp_settings = WhatsAppSettings(
+            enabled=True,
+            profile_dir=str(_get(cfg, "whatsapp_profile_dir", str(Path.cwd() / "whatsapp_profile"))),
+            group_name=str(_get(cfg, "whatsapp_group_name", "")) or None,
+            contacts=tuple(_get(cfg, "whatsapp_contacts", [])),
+            headless=bool(_get(cfg, "whatsapp_headless", False)),
+        )
+
+    return NotificationConfig(emails=email_settings, ovh_sms=ovh_settings, whatsapp=whatsapp_settings)
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +496,84 @@ class NotificationManager:
 
         return success_count > 0
 
+    # ----------------------------- WHATSAPP --------------------------------
+
+    def send_whatsapp(
+        self,
+        message: str,
+        recipients: Optional[Iterable[str]] = None,
+    ) -> bool:
+        """
+        Envoie un message WhatsApp via WhatsApp Web avec Selenium.
+
+        Args:
+            message: Message à envoyer
+            recipients: Liste de contacts ou groupes (optionnel, utilise config par défaut)
+
+        Returns:
+            bool: True si au moins un message a été envoyé avec succès
+
+        Notes:
+            - Utilise WhatsApp Web via Selenium avec profil Chrome persistant
+            - La session doit être authentifiée (scan QR code initial)
+            - Peut envoyer à un groupe (group_name) ou à des contacts individuels
+        """
+        if self._config.whatsapp is None or not self._config.whatsapp.enabled:
+            LOGGER.warning("WhatsApp non configuré ou désactivé.")
+            return False
+
+        settings = self._config.whatsapp
+
+        # Déterminer les destinataires
+        target_list = []
+        if recipients:
+            target_list = list(recipients)
+        elif settings.group_name:
+            target_list = [settings.group_name]
+        elif settings.contacts:
+            target_list = list(settings.contacts)
+        else:
+            LOGGER.error("Aucun destinataire WhatsApp configuré.")
+            return False
+
+        if not target_list:
+            LOGGER.error("Liste de destinataires WhatsApp vide.")
+            return False
+
+        try:
+            # Import dynamique pour éviter dépendance circulaire
+            from linxo_agent.whatsapp_sender import envoyer_message_whatsapp  # type: ignore
+
+            success_count = 0
+            for destinataire in target_list:
+                LOGGER.info("Envoi WhatsApp à '%s'...", destinataire)
+
+                result = envoyer_message_whatsapp(
+                    destinataire=destinataire,
+                    message=message,
+                    profile_dir=settings.profile_dir,
+                    headless=settings.headless,
+                )
+
+                if result.get("success"):
+                    LOGGER.info("Message WhatsApp envoyé à '%s'", destinataire)
+                    success_count += 1
+                else:
+                    LOGGER.error(
+                        "Échec envoi WhatsApp à '%s': %s",
+                        destinataire,
+                        result.get("error", "Erreur inconnue"),
+                    )
+
+            return success_count > 0
+
+        except ImportError:
+            LOGGER.error("Module whatsapp_sender introuvable. Vérifiez l'installation.")
+            return False
+        except Exception as exc:  # pylint: disable=broad-except
+            LOGGER.exception("Erreur inattendue lors de l'envoi WhatsApp: %s", exc)
+            return False
+
     # -------------------------- Façades & budget ---------------------------
 
     def notify_quick(
@@ -469,18 +583,20 @@ class NotificationManager:
         *,
         email: bool = True,
         sms: bool = False,
+        whatsapp: bool = False,
         html_body: Optional[str] = None,
         attachments: Optional[Iterable[Union[str, Path]]] = None,
-    ) -> Tuple[bool, bool]:
+    ) -> Tuple[bool, bool, bool]:
         """
-        Notifie rapidement par email et/ou SMS.
+        Notifie rapidement par email, SMS et/ou WhatsApp.
 
         Returns
         -------
-        (email_ok, sms_ok) : Tuple[bool, bool]
+        (email_ok, sms_ok, whatsapp_ok) : Tuple[bool, bool, bool]
         """
         email_ok = True
         sms_ok = True
+        whatsapp_ok = True
 
         if email:
             email_ok = self.send_email(
@@ -493,7 +609,10 @@ class NotificationManager:
         if sms:
             sms_ok = self.send_sms_ovh(message)
 
-        return email_ok, sms_ok
+        if whatsapp:
+            whatsapp_ok = self.send_whatsapp(message)
+
+        return email_ok, sms_ok, whatsapp_ok
 
     # --- Optionnel : réintègre la fonction V1 de notification budget ---
 

@@ -8,15 +8,16 @@ Ce script orchestre l'ensemble du processus:
 1. Connexion à Linxo
 2. Téléchargement du CSV
 3. Analyse des dépenses
-4. Envoi des notifications (email + SMS)
+4. Envoi des notifications (email + SMS + WhatsApp)
 """
 
 import argparse
 import sys
+import os
 import traceback
 import shutil
 from csv import Error as CsvError
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from smtplib import SMTPException
 from contextlib import suppress
@@ -31,6 +32,7 @@ from linxo_agent.linxo_driver_factory import (
 )
 from linxo_agent.analyzer import analyser_csv
 from linxo_agent.notifications import NotificationManager
+from linxo_agent.run_analysis import should_send_notification, mark_notification_sent
 
 DOWNLOAD_ERRORS = (
     OSError,
@@ -380,10 +382,10 @@ AUCUN rapport budget n'a été envoyé.
             print("[INFO] Les notifications utiliseront le format classique")
             traceback.print_exc()
 
-        # ÉTAPE 3: Envoi des notifications
+        # ÉTAPE 3: Envoi des notifications (Email + SMS + WhatsApp)
         if not skip_notifications:
             print("\n" + "=" * 80)
-            print("ETAPE 3: ENVOI DES NOTIFICATIONS")
+            print("ETAPE 3: ENVOI DES NOTIFICATIONS (EMAIL + SMS + WHATSAPP)")
             print("=" * 80)
 
             try:
@@ -397,10 +399,52 @@ AUCUN rapport budget n'a été envoyé.
                 sms_ok = notif_results.get('sms', False)
                 email_ok = notif_results.get('email', False)
 
-                if sms_ok or email_ok:
+                # Envoi WhatsApp si activé et si fréquence OK
+                whatsapp_ok = False
+                config = get_config()
+                if config.whatsapp_enabled:
+                    # Récupérer la fréquence depuis .env ou utiliser weekly par défaut
+                    notification_frequency = os.getenv('NOTIFICATION_FREQUENCY', 'weekly')
+
+                    if should_send_notification(frequency=notification_frequency):
+                        print("\n[INFO] Envoi notification WhatsApp...")
+
+                        # Préparer le message WhatsApp (résumé budget similaire au SMS)
+                        try:
+                            from linxo_agent.report_formatter_v2 import formater_sms_v2  # type: ignore
+                            total_depenses = float(analysis_result.get('total_variables', 0) or 0)
+                            budget_max = float(analysis_result.get('budget_max', 0) or 0)
+                            reste = budget_max - total_depenses
+                            pct = (total_depenses / budget_max * 100) if budget_max > 0 else 0.0
+                            whatsapp_msg = formater_sms_v2(total_depenses, budget_max, reste, pct)
+                        except Exception:  # pylint: disable=broad-except
+                            total_depenses = float(analysis_result.get('total_variables', 0) or 0)
+                            budget_max = float(analysis_result.get('budget_max', 0) or 0)
+                            reste = budget_max - total_depenses
+                            pct = (total_depenses / budget_max * 100) if budget_max > 0 else 0.0
+                            whatsapp_msg = (
+                                f"Budget: {total_depenses:.0f}/{budget_max:.0f}€ "
+                                f"({pct:.0f}%), reste {reste:.0f}€"
+                            )
+
+                        # Envoyer via WhatsApp
+                        whatsapp_ok = notification_manager.send_whatsapp(whatsapp_msg)
+
+                        if whatsapp_ok:
+                            print("[OK] Notification WhatsApp envoyée")
+                            mark_notification_sent()
+                        else:
+                            print("[WARN] Échec envoi WhatsApp")
+                    else:
+                        print("[INFO] Notification WhatsApp non due, skip")
+                else:
+                    print("[INFO] WhatsApp désactivé, skip")
+
+                if sms_ok or email_ok or whatsapp_ok:
                     print("\n[SUCCESS] Notifications envoyees!")
                     print(f"  Email: {'OK' if email_ok else 'ECHEC'}")
                     print(f"  SMS: {'OK' if sms_ok else 'ECHEC'}")
+                    print(f"  WhatsApp: {'OK' if whatsapp_ok else 'SKIP/ECHEC'}")
                     results['notification_success'] = True
                 else:
                     print("[WARNING] Aucune notification n'a pu etre envoyee")

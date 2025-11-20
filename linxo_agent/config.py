@@ -236,6 +236,23 @@ class Config:
             if phone.strip()
         ]
 
+        # Configuration WhatsApp
+        self.whatsapp_enabled = os.getenv('WHATSAPP_ENABLED', 'false').lower() in ('true', '1', 'yes')
+        # Gérer le cas où WHATSAPP_PROFILE_DIR est défini mais vide
+        whatsapp_profile_env = os.getenv('WHATSAPP_PROFILE_DIR', '').strip()
+        self.whatsapp_profile_dir = (
+            whatsapp_profile_env if whatsapp_profile_env
+            else str(self.base_dir / 'whatsapp_profile')
+        )
+        # Gérer le cas où WHATSAPP_GROUP_NAME est défini mais vide
+        self.whatsapp_group_name = os.getenv('WHATSAPP_GROUP_NAME', '').strip() or None
+        self.whatsapp_contacts = [
+            contact.strip()
+            for contact in os.getenv('WHATSAPP_CONTACTS', '').split(',')
+            if contact.strip()
+        ]
+        self.whatsapp_headless = os.getenv('WHATSAPP_HEADLESS', 'false').lower() in ('true', '1', 'yes')
+
         # Priorité 2: Depuis api_secrets.json si disponible
         if self.api_secrets_file.exists():
             try:
@@ -259,6 +276,20 @@ class Config:
                     self.ovh_expediteur_sms = ovh_secrets.get('EXPEDITEUR_SMS', self.sms_sender)
                     self.ovh_email = ovh_secrets.get('OVH_EMAIL', self.ovh_email_envoi)
 
+                if 'WHATSAPP' in secrets:
+                    whatsapp_secrets = secrets['WHATSAPP'].get('secrets', {})
+                    self.whatsapp_enabled = whatsapp_secrets.get('ENABLED', self.whatsapp_enabled)
+                    self.whatsapp_profile_dir = whatsapp_secrets.get('PROFILE_DIR',
+                                                                     self.whatsapp_profile_dir)
+                    self.whatsapp_group_name = whatsapp_secrets.get('GROUP_NAME',
+                                                                    self.whatsapp_group_name)
+                    contacts_str = whatsapp_secrets.get('CONTACTS', '')
+                    if contacts_str:
+                        self.whatsapp_contacts = [
+                            c.strip() for c in contacts_str.split(',') if c.strip()
+                        ]
+                    self.whatsapp_headless = whatsapp_secrets.get('HEADLESS', self.whatsapp_headless)
+
                 print(f"[OK] Secrets API charges depuis: {self.api_secrets_file}")
             except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
                 print(f"[WARN] Erreur lors du chargement des secrets: {e}")
@@ -281,6 +312,13 @@ class Config:
 
         if not self.sms_recipients:
             print("[WARN] ATTENTION: Aucun destinataire SMS configure")
+
+        if self.whatsapp_enabled:
+            if not self.whatsapp_group_name and not self.whatsapp_contacts:
+                print("[WARN] ATTENTION: WhatsApp activé mais aucun destinataire configuré")
+            else:
+                print(f"[OK] WhatsApp activé - Groupe: {self.whatsapp_group_name or 'N/A'} - "
+                      f"Contacts: {len(self.whatsapp_contacts)}")
 
     def get_latest_csv(self, check_already_sent=True, max_age_days=2):
         """
