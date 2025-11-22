@@ -73,9 +73,28 @@ def initialiser_driver_whatsapp(profile_dir=None, headless=False):
         options.add_argument("--headless=new")
 
     try:
+        # CORRECTION: Détecter Chrome explicitement pour harmoniser avec Linxo
+        # et éviter l'erreur "Binary Location Must be a String"
+        try:
+            from .chrome_detector import detect_chrome_binary
+        except ImportError:
+            from chrome_detector import detect_chrome_binary  # type: ignore
+
+        chrome_binary = detect_chrome_binary()
+        if chrome_binary:
+            logger.info(f"Chrome trouvé: {chrome_binary}")
+        else:
+            logger.warning("Chrome non trouvé dans les chemins standards, tentative auto-détection")
+
         # Sur Linux/VPS, ne pas utiliser use_subprocess si on a Xvfb
-        use_subprocess = platform.system() == "Windows"
-        driver = uc.Chrome(options=options, use_subprocess=use_subprocess)
+        # IMPORTANT: Harmonisé avec linxo_connexion_undetected.py
+        use_subprocess = True  # Toujours True pour cohérence avec module Linxo
+
+        driver = uc.Chrome(
+            options=options,
+            browser_executable_path=chrome_binary,  # Spécifier explicitement le chemin
+            use_subprocess=use_subprocess
+        )
         logger.info("Driver WhatsApp initialisé avec succès")
         return driver
     except Exception as e:

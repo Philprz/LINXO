@@ -212,11 +212,35 @@ def initialiser_driver_linxo_undetected(
             }
             options.add_experimental_option("prefs", prefs)
 
+            # CORRECTION: Détecter et spécifier explicitement le chemin de Chrome
+            # pour éviter l'erreur "Binary Location Must be a String"
+            chrome_binary = None
+            chrome_paths = [
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/chromium',
+                '/usr/bin/chromium-browser',
+                '/snap/bin/chromium',
+                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            ]
+
+            for path in chrome_paths:
+                if os.path.exists(path):
+                    chrome_binary = path
+                    print(f"[INFO] Chrome trouvé: {chrome_binary}")
+                    break
+
+            if chrome_binary is None:
+                print("[WARN] Chrome non trouvé dans les chemins standards")
+                print("[INFO] Tentative de détection automatique...")
+
             # Création du driver avec undetected-chromedriver
             # Le monkey patch au niveau du module redirige automatiquement le cache
             print("[INFO] Création du driver avec cache personnalisé...")
             driver = uc.Chrome(
                 options=options,
+                browser_executable_path=chrome_binary,  # Spécifier explicitement le chemin
                 headless=is_server,
                 use_subprocess=True,
                 version_main=None  # Auto-detect Chrome version
