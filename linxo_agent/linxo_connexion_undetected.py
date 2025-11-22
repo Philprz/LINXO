@@ -178,14 +178,19 @@ def initialiser_driver_linxo_undetected(
             user_data_dir = _creer_user_data_dir_unique(config.base_dir)
 
             # Détection automatique du mode headless pour VPS/serveurs
-            is_server = (
-                os.environ.get('DISPLAY') is None or  # Pas d'affichage X
-                'microsoft' in platform.uname().release.lower() or  # WSL
-                headless  # Explicitement demandé
-            )
+            # CORRECTION: Si DISPLAY est défini (même :99 avec Xvfb), ne PAS utiliser headless
+            display_env = os.environ.get('DISPLAY')
 
-            if is_server:
-                print("[INFO] Mode headless actif (environnement serveur détecté)")
+            # Utiliser headless SEULEMENT si explicitement demandé ET pas de DISPLAY
+            # Sinon, utiliser Xvfb si disponible (DISPLAY=:99)
+            use_headless = headless and display_env is None
+
+            if display_env:
+                print(f"[INFO] DISPLAY détecté: {display_env} (utilisation de Xvfb, pas headless)")
+            elif use_headless:
+                print("[INFO] Mode headless actif (pas de DISPLAY disponible)")
+            else:
+                print("[INFO] Mode normal (pas headless, pas de DISPLAY)")
 
             print(f"[INFO] Dossier de téléchargement: {download_dir}")
             print(f"[INFO] Dossier user-data: {user_data_dir}")
@@ -214,26 +219,18 @@ def initialiser_driver_linxo_undetected(
 
             # CORRECTION: Détecter et spécifier explicitement le chemin de Chrome
             # pour éviter l'erreur "Binary Location Must be a String"
-            chrome_binary = None
-            chrome_paths = [
-                '/usr/bin/google-chrome',
-                '/usr/bin/google-chrome-stable',
-                '/usr/bin/chromium',
-                '/usr/bin/chromium-browser',
-                '/snap/bin/chromium',
-                'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-                'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-            ]
+            # Utilise le module chrome_detector pour harmoniser avec WhatsApp
+            try:
+                from .chrome_detector import detect_chrome_binary
+            except ImportError:
+                from chrome_detector import detect_chrome_binary  # type: ignore
 
-            for path in chrome_paths:
-                if os.path.exists(path):
-                    chrome_binary = path
-                    print(f"[INFO] Chrome trouvé: {chrome_binary}")
-                    break
-
-            if chrome_binary is None:
+            chrome_binary = detect_chrome_binary()
+            if chrome_binary:
+                print(f"[INFO] Chrome trouvé: {chrome_binary}")
+            else:
                 print("[WARN] Chrome non trouvé dans les chemins standards")
-                print("[INFO] Tentative de détection automatique...")
+                print("[INFO] Tentative de détection automatique par undetected-chromedriver...")
 
             # Création du driver avec undetected-chromedriver
             # Le monkey patch au niveau du module redirige automatiquement le cache
@@ -241,7 +238,7 @@ def initialiser_driver_linxo_undetected(
             driver = uc.Chrome(
                 options=options,
                 browser_executable_path=chrome_binary,  # Spécifier explicitement le chemin
-                headless=is_server,
+                headless=use_headless,  # CORRECTION: utiliser use_headless au lieu de is_server
                 use_subprocess=True,
                 version_main=None  # Auto-detect Chrome version
             )
