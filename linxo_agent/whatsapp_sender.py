@@ -87,8 +87,9 @@ def initialiser_driver_whatsapp(profile_dir=None, headless=False):
             logger.warning("Chrome non trouvé dans les chemins standards, tentative auto-détection")
 
         # Sur Linux/VPS, ne pas utiliser use_subprocess si on a Xvfb
-        # IMPORTANT: Harmonisé avec linxo_connexion_undetected.py
-        use_subprocess = True  # Toujours True pour cohérence avec module Linxo
+        # IMPORTANT: WhatsApp nécessite use_subprocess=False sur Linux (différent de Linxo)
+        # car WhatsApp Web a besoin d'un environnement graphique plus direct avec Xvfb
+        use_subprocess = platform.system() == "Windows"
 
         driver = uc.Chrome(
             options=options,
@@ -102,14 +103,14 @@ def initialiser_driver_whatsapp(profile_dir=None, headless=False):
         raise
 
 
-def authentifier_whatsapp(driver, timeout=120):
+def authentifier_whatsapp(driver, timeout=180):
     """
     Authentifie WhatsApp Web en scannant le QR code.
     Attend que l'utilisateur scanne le QR code avec son téléphone.
 
     Args:
         driver: Instance WebDriver
-        timeout: Temps max d'attente pour le scan (secondes)
+        timeout: Temps max d'attente pour le scan (défaut: 180s / 3 minutes)
 
     Returns:
         bool: True si authentifié, False sinon
@@ -151,14 +152,14 @@ def authentifier_whatsapp(driver, timeout=120):
             return False
 
 
-def rechercher_contact(driver, nom_contact_ou_groupe, timeout=15):
+def rechercher_contact(driver, nom_contact_ou_groupe, timeout=30):
     """
     Recherche et sélectionne un contact ou groupe WhatsApp.
 
     Args:
         driver: Instance WebDriver
         nom_contact_ou_groupe: Nom du contact ou groupe à rechercher
-        timeout: Timeout pour la recherche
+        timeout: Timeout pour la recherche (défaut: 30s pour laisser le temps à WhatsApp Web de charger)
 
     Returns:
         bool: True si contact trouvé et sélectionné, False sinon
@@ -238,7 +239,7 @@ def rechercher_contact(driver, nom_contact_ou_groupe, timeout=15):
         return False
 
 
-def envoyer_message(driver, message, timeout=10):
+def envoyer_message(driver, message, timeout=30):
     """
     Envoie un message dans la conversation actuellement ouverte.
     Utilise ActionChains pour simuler une vraie saisie clavier.
@@ -246,7 +247,7 @@ def envoyer_message(driver, message, timeout=10):
     Args:
         driver: Instance WebDriver
         message: Texte du message à envoyer
-        timeout: Timeout pour l'envoi
+        timeout: Timeout pour l'envoi (défaut: 30s pour gérer les messages longs)
 
     Returns:
         bool: True si message envoyé, False sinon

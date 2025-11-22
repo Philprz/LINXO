@@ -447,7 +447,7 @@ Une intervention technique est nécessaire pour corriger ce problème.
 
                 # Préparer le message WhatsApp (résumé budget similaire au SMS)
                 try:
-                    from report_formatter_v2 import formater_sms_v2  # type: ignore
+                    from .report_formatter_v2 import formater_sms_v2  # type: ignore
                     total_depenses = float(analysis_result.get('total_variables', 0) or 0)
                     budget_max = float(analysis_result.get('budget_max', 0) or 0)
                     reste = budget_max - total_depenses
